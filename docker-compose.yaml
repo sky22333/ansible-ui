@@ -1,7 +1,8 @@
 services:
   app:
     build: .
-    network_mode: host
+    ports:
+      - "5000:5000"
     environment:
       - ANSIBLE_HOST_KEY_CHECKING=False
       - ADMIN_USERNAME=admin123
