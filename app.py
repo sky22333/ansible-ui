@@ -1,13 +1,18 @@
-from flask import Flask, request, jsonify, send_from_directory, Response, render_template
+from flask import Flask, request, jsonify, send_from_directory, Response, render_template, session, redirect, url_for
 from database import Database
 from ansible_manager import AnsibleManager
 import json
 import os
 from functools import wraps
+import secrets
 
 app = Flask(__name__, static_folder='public', static_url_path='/public')
+app.secret_key = secrets.token_hex(16)  # 随机生成会话密钥
 db = Database()
 ansible = AnsibleManager(db)
+
+ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
+ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'admin')
 
 def handle_error(f):
     """错误处理装饰器"""
@@ -19,6 +24,31 @@ def handle_error(f):
             app.logger.error(f"Error in {f.__name__}: {str(e)}")
             return jsonify({'error': str(e)}), 500
     return decorated_function
+
+@app.before_request
+def before_request():
+    """检查用户登录状态"""
+    # 如果没有登录且请求不是登录页，则重定向到登录页
+    if request.path != '/api/login' and request.path != '/login' and not session.get('logged_in'):
+        return redirect(url_for('login_page'))
+
+@app.route('/login')
+def login_page():
+    """渲染登录页面"""
+    return send_from_directory('templates', 'login.html')
+
+@app.route('/api/login', methods=['POST'])
+def login():
+    """用户登录"""
+    data = request.json
+    username = data.get('username')
+    password = data.get('password')
+
+    if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+        session['logged_in'] = True  # 设置登录状态
+        return jsonify({'success': True, 'message': '登录成功'})
+    else:
+        return jsonify({'success': False, 'message': '用户名或密码错误'})
 
 @app.route('/')
 def index():

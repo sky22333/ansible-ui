@@ -4,5 +4,7 @@ services:
     network_mode: host
     environment:
       - ANSIBLE_HOST_KEY_CHECKING=False
+      - ADMIN_USERNAME=admin123
+      - ADMIN_PASSWORD=admin123
     volumes:
       - ./db:/app/db

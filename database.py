@@ -35,6 +35,18 @@ class Database:
                 )
             """)
 
+    def init_users_table(self):
+        """初始化用户表"""
+        with self.get_connection() as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username TEXT NOT NULL,
+                    password TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
     @contextmanager
     def get_connection(self):
         """获取数据库连接的上下文管理器"""
