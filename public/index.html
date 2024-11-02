@@ -6,12 +6,20 @@
     <title>Ansible面板</title>
     <!-- Bootstrap CSS -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome CSS for icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
     <!-- Custom CSS -->
     <link href="/public/style.css" rel="stylesheet">
     <style>
         /* 允许手动调整大小 */
         #commandInput {
             resize: vertical; /* 仅允许垂直调整大小 */
+        }
+        /* 底部图标样式 */
+        #footer {
+            text-align: center;
+            margin-top: 20px;
+            padding: 20px 0;
         }
     </style>
 </head>
@@ -133,6 +141,12 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <div id="footer">
+        <a href="https://github.com/sky22333/ansible" target="_blank" title="项目地址">
+            <i class="fab fa-github"></i>
+        </a>
     </div>
 
     <!-- Bootstrap JS Bundle with Popper -->
