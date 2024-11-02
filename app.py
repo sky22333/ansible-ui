@@ -45,7 +45,7 @@ def login():
     password = data.get('password')
 
     if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
-        session['logged_in'] = True  # 设置登录状态
+        session['logged_in'] = True
         return jsonify({'success': True, 'message': '登录成功'})
     else:
         return jsonify({'success': False, 'message': '用户名或密码错误'})
@@ -60,7 +60,6 @@ def index():
 def get_hosts():
     """获取所有主机列表"""
     hosts = db.get_hosts()
-    # 出于安全考虑，不返回密码
     for host in hosts:
         host['password'] = '********'
     return jsonify(hosts)
@@ -71,7 +70,7 @@ def get_host(host_id):
     """获取单个主机信息"""
     host = db.get_host(host_id)
     if host:
-        host['password'] = '********'  # 不返回密码
+        host['password'] = '********'
         return jsonify(host)
     return jsonify({'error': 'Host not found'}), 404
 
@@ -186,7 +185,6 @@ def terminal(host_id):
     if not host:
         return jsonify({'error': 'Host not found'}), 404
     
-    # 不传递密码到前端
     host['password'] = '********'
     return render_template('terminal.html', host=host)
 
@@ -237,4 +235,4 @@ if __name__ == '__main__':
     )
     
     # 启动应用
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000)

@@ -1,4 +1,3 @@
-// main.js
 $(document).ready(function() {
     // 加载主机列表
     function loadHosts() {
@@ -80,7 +79,7 @@ $(document).ready(function() {
             $('#editHostAddress').val(host.address);
             $('#editHostUsername').val(host.username);
             $('#editHostPort').val(host.port);
-            $('#editHostPassword').val(''); // 出于安全考虑不显示原密码
+            $('#editHostPassword').val('');
             $('#editHostModal').modal('show');
         });
     });
