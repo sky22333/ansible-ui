@@ -1,0 +1,8 @@
+services:
+  app:
+    build: .
+    network_mode: host
+    environment:
+      - ANSIBLE_HOST_KEY_CHECKING=False
+    volumes:
+      - ./db:/app/db

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ansible面板</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link href="/public/style.css" rel="stylesheet">
+    <style>
+        /* 允许手动调整大小 */
+        #commandInput {
+            resize: vertical; /* 仅允许垂直调整大小 */
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <nav class="navbar navbar-dark bg-dark mb-4">
+            <div class="container-fluid">
+                <span class="navbar-brand mb-0 h1">Ansible面板</span>
+            </div>
+        </nav>
+
+        <div class="row" id="mainContent">
+            <!-- 左侧主机管理面板 -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title">主机管理</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="batchInput" class="form-label">批量添加主机，空格隔开，格式：（编号 地址 用户名 端口 密码）</label>
+                            <textarea class="form-control" id="batchInput" rows="5" placeholder="1 192.168.1.1 root 22 password1&#10;2 192.168.1.2 root 22 password2"></textarea>
+                        </div>
+                        <button class="btn btn-primary" id="addHosts">添加主机</button>
+                        
+                        <div class="mt-4">
+                            <h6>主机列表</h6>
+                            <div class="table-responsive">
+                                <table class="table table-hover" id="hostTable">
+                                    <thead>
+                                        <tr>
+                                            <th>编号</th>
+                                            <th>地址</th>
+                                            <th>用户名</th>
+                                            <th>端口</th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- 动态填充 -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧命令执行面板 -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title">命令执行</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="commandInput" class="form-label">输入命令</label>
+                            <textarea class="form-control" id="commandInput" rows="5" placeholder="输入要执行的命令"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="hostSelect" class="form-label">选择主机（按Ctrl可多选）</label>
+                            <select class="form-select" id="hostSelect" multiple>
+                                <!-- 动态填充 -->
+                            </select>
+                        </div>
+                        <div class="btn-group">
+                            <button class="btn btn-primary" id="sendSingle">发送到选中主机</button>
+                            <button class="btn btn-success" id="sendAll">发送到所有主机</button>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <h6>执行日志</h6>
+                            <div class="log-container border p-3" id="logContainer" style="height: 300px; overflow-y: auto;">
+                                <!-- 动态填充 -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编辑主机模态框 -->
+    <div class="modal fade" id="editHostModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">编辑主机</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editHostForm">
+                        <input type="hidden" id="editHostId">
+                        <div class="mb-3">
+                            <label class="form-label">备注</label>
+                            <input type="text" class="form-control" id="editHostComment">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">地址</label>
+                            <input type="text" class="form-control" id="editHostAddress">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">用户名</label>
+                            <input type="text" class="form-control" id="editHostUsername">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">端口</label>
+                            <input type="number" class="form-control" id="editHostPort">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">密码</label>
+                            <input type="password" class="form-control" id="editHostPassword">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="saveHostEdit">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS Bundle with Popper -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script src="/public/main.js"></script>
+</body>
+</html>

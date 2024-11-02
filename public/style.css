@@ -1,0 +1,47 @@
+/* style.css */
+.log-container {
+    background-color: #f8f9fa;
+    font-family: monospace;
+    font-size: 0.9rem;
+    white-space: pre-wrap;
+}
+
+.host-row:hover {
+    background-color: rgba(0,0,0,0.05);
+    cursor: pointer;
+}
+
+.log-entry {
+    margin-bottom: 8px;
+    padding: 4px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.log-entry.success {
+    color: #28a745;
+}
+
+.log-entry.error {
+    color: #dc3545;
+}
+
+.table td {
+    vertical-align: middle;
+}
+
+.btn-group {
+    gap: 8px;
+}
+
+#hostSelect {
+    height: 150px;
+}
+
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    margin-bottom: 1rem;
+}
+
+.navbar {
+    box-shadow: 0 2px 4px rgba(0,0,0,.1);
+}
