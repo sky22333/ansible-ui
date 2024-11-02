@@ -37,7 +37,8 @@
 |---------------------|--------------------------------------------------|----------------------------------|
 | **文件操作命令**    | `ls`, `cp`, `mv`, `rm`                          | 用于列出、复制、移动和删除文件       |
 | **目录操作命令**    | `cd`                                            | 用于更改当前工作目录                |
-| **脚本执行**        | `./script.sh`  `bash <(wget -qO- https://github.com/xx/shell/raw/main/xx.sh)`                            | 执行指定的Shell脚本或者远程脚本              |
+| **脚本执行**        | `./script.sh`                                  | 执行指定的Shell脚本             |
+| **远程脚本**        |  `bash <(wget -qO- https://github.com/xx/shell/raw/main/xx.sh)`   | 执行指定的远程shell脚本              |
 | **管道和重定向**    | `echo "Hello, World!" | grep "Hello" > output.txt` | 使用管道和重定向进行数据处理        |
 | **条件和循环**      | `if [ -f "file.txt" ]; then echo "File exists"; fi` | 使用条件语句执行相应操作           |
 | **复杂命令**        | `cd /path/to/directory; ./run_script.sh`       | 组合多个命令，使用分号分隔          |
