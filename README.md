@@ -17,9 +17,18 @@
 
 
 ### 使用方法
-1. **运行项目**：
-   - 拉取仓库代码
-   - 使用 `docker compose up -d` 命令启动项目。
+1. **Docker部署**：
+
+```
+docker run -d \
+  --name ansible \
+  -p 5000:5000 \
+  -e ANSIBLE_HOST_KEY_CHECKING=False \
+  -e ADMIN_USERNAME=admin123 \
+  -e ADMIN_PASSWORD=admin123 \
+  -v ./ansible:/app/db \
+  ghcr.io/sky22333/ansible:latest
+```
 
 2. **访问面板**：
    - 打开浏览器，输入`http://IP:5000`访问面板，默认用户名`admin123`，默认密码`admin123`，通过`docker-compose.yaml`的环境变量修改用户名和密码。
