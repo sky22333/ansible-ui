@@ -27,7 +27,7 @@ docker run -d \
   -e ADMIN_USERNAME=admin123 \
   -e ADMIN_PASSWORD=admin123 \
   -v ./ansible:/app/db \
-  ghcr.io/sky22333/ansible:latest
+  ghcr.io/sky22333/ansible
 ```
 
 2. **访问面板**：
