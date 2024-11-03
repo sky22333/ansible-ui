@@ -16,7 +16,8 @@ $(document).ready(function() {
                         <td>
                             <button class="btn btn-sm btn-primary edit-host" data-id="${host.id}">编辑</button>
                             <button class="btn btn-sm btn-danger delete-host" data-id="${host.id}">删除</button>
-                            <button class="btn btn-sm btn-success connect-host" data-id="${host.id}">连接</button>
+                            <button class="btn btn-sm btn-success check-host" data-id="${host.id}">ping</button>
+                            <span class="health-status" id="health-${host.id}"></span>
                         </td>
                     </tr>
                 `);
@@ -111,11 +112,34 @@ $(document).ready(function() {
         });
     });
 
-    // 连接到主机
-    $(document).on('click', '.connect-host', function() {
-        const hostId = $(this).data('id');
-        window.open(`/terminal/${hostId}`, '_blank', 'width=800,height=600');
-    });
+     // 连接到主机（改为连通性测试）
+	$(document).on('click', '.check-host', function() {
+	    const hostId = $(this).data('id');
+	    const statusSpan = $(`#health-${hostId}`);
+	    
+	    statusSpan.text(' 检查中...');
+	    
+	    $.ajax({
+	        url: `/api/hosts/${hostId}/ping`,
+	        method: 'GET',
+	        success: function(response) {
+	            if (response.status === 'success') {
+	                statusSpan.text(' 连接正常');
+	                statusSpan.css('color', 'green');
+	            } else if (response.status === 'unreachable') {
+	                statusSpan.text(' 无法连接');
+	                statusSpan.css('color', 'red');
+	            } else {
+	                statusSpan.text(' 失败');
+	                statusSpan.css('color', 'orange');
+	            }
+	        },
+	        error: function() {
+	            statusSpan.text(' 检查失败');
+	            statusSpan.css('color', 'red');
+	        }
+	    });
+	});
 
     // 发送命令
     $('#sendSingle').click(function() {

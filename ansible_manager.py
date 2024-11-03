@@ -162,6 +162,97 @@ class AnsibleManager:
             # 清理临时文件
             os.remove(inventory_path)
 
+    def execute_ping(self, target_hosts):
+        """执行 Ansible ping 模块"""
+        # 生成临时 inventory 文件
+        inventory_path = self.generate_inventory(target_hosts)
+        
+        try:
+            # 初始化必要的对象
+            loader = DataLoader()
+            inventory = InventoryManager(loader=loader, sources=inventory_path)
+            variable_manager = VariableManager(loader=loader, inventory=inventory)
+            
+            # 创建 play 源数据
+            play_source = dict(
+                name="Ansible Ping",
+                hosts='managed_hosts',
+                gather_facts='no',
+                tasks=[dict(action=dict(module='ping'))]
+            )
+
+            # 创建 play 对象
+            play = Play().load(play_source, variable_manager=variable_manager, loader=loader)
+
+            # 创建回调插件对象
+            results_callback = ResultCallback()
+
+            # 创建任务队列管理器
+            tqm = None
+            try:
+                tqm = TaskQueueManager(
+                    inventory=inventory,
+                    variable_manager=variable_manager,
+                    loader=loader,
+                    passwords=dict(),
+                    stdout_callback=results_callback
+                )
+                # 执行 play
+                tqm.run(play)
+            finally:
+                if tqm is not None:
+                    tqm.cleanup()
+
+            # 处理结果
+            results = {
+                'success': {},
+                'failed': {},
+                'unreachable': {}
+            }
+
+            # 处理成功的结果
+            for host, result in results_callback.host_ok.items():
+                results['success'][host] = result._result
+                # 记录日志
+                host_id = next((h['id'] for h in target_hosts if h['address'] == host), None)
+                if host_id:
+                    self.db.log_command(
+                        host_id,
+                        'ping',
+                        json.dumps(result._result),
+                        'success'
+                    )
+
+            # 处理失败的结果
+            for host, result in results_callback.host_failed.items():
+                results['failed'][host] = result._result
+                host_id = next((h['id'] for h in target_hosts if h['address'] == host), None)
+                if host_id:
+                    self.db.log_command(
+                        host_id,
+                        'ping',
+                        json.dumps(result._result),
+                        'failed'
+                    )
+
+            # 处理不可达的结果
+            for host, result in results_callback.host_unreachable.items():
+                results['unreachable'][host] = result._result
+                host_id = next((h['id'] for h in target_hosts if h['address'] == host), None)
+                if host_id:
+                    self.db.log_command(
+                        host_id,
+                        'ping',
+                        json.dumps(result._result),
+                        'unreachable'
+                    )
+
+            return results
+
+        finally:
+            # 清理临时文件
+            os.remove(inventory_path)
+
     def get_host_facts(self, host_id):
         """获取主机详细信息"""
         host = self.db.get_host(host_id)

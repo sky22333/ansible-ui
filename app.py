@@ -197,14 +197,26 @@ def get_host_facts(host_id):
         return jsonify(facts)
     return jsonify({'error': 'Failed to get host facts'}), 404
 
-@app.route('/api/health')
-def health_check():
-    """健康检查接口"""
-    return jsonify({
-        'status': 'healthy',
-        'database': 'connected' if db else 'disconnected',
-        'ansible': 'ready' if ansible else 'not ready'
-    })
+@app.route('/api/hosts/<int:host_id>/ping', methods=['GET'])
+@handle_error
+def ping_host(host_id):
+    """检查主机连通性"""
+    host = db.get_host(host_id)
+    if not host:
+        return jsonify({'error': 'Host not found'}), 404
+    
+    # 使用 Ansible 执行 ping 模块
+    results = ansible.execute_ping([host])
+    
+    # 解析结果
+    host_address = host['address']
+    if host_address in results['success']:
+        return jsonify({'status': 'success', 'message': '连接正常'})
+    elif host_address in results['unreachable']:
+        return jsonify({'status': 'unreachable', 'message': '无法连接'})
+    else:
+        return jsonify({'status': 'failed', 'message': '失败'})
+
 
 @app.errorhandler(404)
 def not_found_error(error):
