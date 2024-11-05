@@ -6,7 +6,6 @@ $(document).ready(function() {
             $('#hostSelect').empty();
             
             data.forEach(function(host) {
-                // 添加到主机表格
                 $('#hostTable tbody').append(`
                     <tr>
                         <td>${host.comment}</td>
@@ -22,7 +21,6 @@ $(document).ready(function() {
                     </tr>
                 `);
                 
-                // 添加到选择框
                 $('#hostSelect').append(`
                     <option value="${host.id}">${host.comment} (${host.address})</option>
                 `);
@@ -30,10 +28,48 @@ $(document).ready(function() {
         });
     }
 
+    // 简单的格式验证
+    function validateHostInput(input) {
+        const lines = input.trim().split('\n');
+        const errors = [];
+        
+        lines.forEach((line, index) => {
+            if (line.trim() === '') return;
+            const parts = line.trim().split(/\s+/);
+            if (parts.length !== 5) {
+                errors.push(`第${index + 1}行：需要5个参数（备注 地址 用户名 端口 密码），实际得到${parts.length}个参数`);
+            }
+        });
+        
+        return {
+            isValid: errors.length === 0,
+            errors: errors
+        };
+    }
+
     // 批量添加主机
     $('#addHosts').click(function() {
-        const hostsData = $('#batchInput').val().split('\n').map(line => {
-            const [comment, address, username, port, password] = line.trim().split(' ');
+        const inputText = $('#batchInput').val();
+        if (!inputText.trim()) {
+            addLog('请输入主机信息', 'error');
+            return;
+        }
+
+        // 验证输入格式
+        const validation = validateHostInput(inputText);
+        if (!validation.isValid) {
+            validation.errors.forEach(error => {
+                addLog(error, 'error');
+            });
+            return;
+        }
+
+        // 禁用按钮并更改文字
+        const $addButton = $('#addHosts');
+        $addButton.prop('disabled', true).text('添加中');
+
+        const hostsData = inputText.split('\n').map(line => {
+            const [comment, address, username, port, password] = line.trim().split(/\s+/);
             return { comment, address, username, port, password };
         }).filter(host => host.address);
 
@@ -49,6 +85,10 @@ $(document).ready(function() {
             },
             error: function(xhr) {
                 addLog('添加主机失败: ' + xhr.responseText, 'error');
+            },
+            complete: function() {
+                // 恢复按钮状态和文字
+                $addButton.prop('disabled', false).text('添加主机');
             }
         });
     });
@@ -112,34 +152,34 @@ $(document).ready(function() {
         });
     });
 
-     // 连接到主机（改为连通性测试）
-	$(document).on('click', '.check-host', function() {
-	    const hostId = $(this).data('id');
-	    const statusSpan = $(`#health-${hostId}`);
-	    
-	    statusSpan.text(' 检查中...');
-	    
-	    $.ajax({
-	        url: `/api/hosts/${hostId}/ping`,
-	        method: 'GET',
-	        success: function(response) {
-	            if (response.status === 'success') {
-	                statusSpan.text(' 连接正常');
-	                statusSpan.css('color', 'green');
-	            } else if (response.status === 'unreachable') {
-	                statusSpan.text(' 无法连接');
-	                statusSpan.css('color', 'red');
-	            } else {
-	                statusSpan.text(' 失败');
-	                statusSpan.css('color', 'orange');
-	            }
-	        },
-	        error: function() {
-	            statusSpan.text(' 检查失败');
-	            statusSpan.css('color', 'red');
-	        }
-	    });
-	});
+    // 连通性测试
+    $(document).on('click', '.check-host', function() {
+        const hostId = $(this).data('id');
+        const statusSpan = $(`#health-${hostId}`);
+        
+        statusSpan.text(' 检查中...');
+        
+        $.ajax({
+            url: `/api/hosts/${hostId}/ping`,
+            method: 'GET',
+            success: function(response) {
+                if (response.status === 'success') {
+                    statusSpan.text(' 连接正常');
+                    statusSpan.css('color', 'green');
+                } else if (response.status === 'unreachable') {
+                    statusSpan.text(' 无法连接');
+                    statusSpan.css('color', 'red');
+                } else {
+                    statusSpan.text(' 失败');
+                    statusSpan.css('color', 'orange');
+                }
+            },
+            error: function() {
+                statusSpan.text(' 检查失败');
+                statusSpan.css('color', 'red');
+            }
+        });
+    });
 
     // 发送命令
     $('#sendSingle').click(function() {
