@@ -16,6 +16,7 @@ $(document).ready(function() {
                             <button class="btn btn-sm btn-primary edit-host" data-id="${host.id}">编辑</button>
                             <button class="btn btn-sm btn-danger delete-host" data-id="${host.id}">删除</button>
                             <button class="btn btn-sm btn-success check-host" data-id="${host.id}">ping</button>
+                            <button class="btn btn-sm btn-info open-terminal" data-id="${host.id}">终端</button>
                             <span class="health-status" id="health-${host.id}"></span>
                         </td>
                     </tr>
@@ -250,6 +251,12 @@ $(document).ready(function() {
         logContainer.append(logEntry);
         logContainer.scrollTop(logContainer[0].scrollHeight);
     }
+
+    // 添加终端按钮点击事件
+    $(document).on('click', '.open-terminal', function() {
+        const hostId = $(this).data('id');
+        window.open(`/terminal/${hostId}`, '_blank', 'width=1024,height=768');
+    });
 
     // 初始加载
     loadHosts();

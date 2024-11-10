@@ -5,6 +5,18 @@ import json
 import os
 from functools import wraps
 import secrets
+from flask_sock import Sock
+import paramiko
+import threading
+import pty
+import os
+import select
+import termios
+import struct
+import fcntl
+import stat
+from werkzeug.utils import secure_filename
+import time
 
 app = Flask(__name__, static_folder='public', static_url_path='/public')
 app.secret_key = secrets.token_hex(16)  # 随机生成会话密钥
@@ -13,6 +25,8 @@ ansible = AnsibleManager(db)
 
 ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
 ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'admin')
+
+sock = Sock(app)
 
 def handle_error(f):
     """错误处理装饰器"""
@@ -178,14 +192,11 @@ def get_logs():
     return jsonify(logs)
 
 @app.route('/terminal/<int:host_id>')
-@handle_error
-def terminal(host_id):
+def terminal_page(host_id):
     """渲染终端页面"""
     host = db.get_host(host_id)
     if not host:
         return jsonify({'error': 'Host not found'}), 404
-    
-    host['password'] = '********'
     return render_template('terminal.html', host=host)
 
 @app.route('/api/hosts/<int:host_id>/facts', methods=['GET'])
@@ -217,6 +228,382 @@ def ping_host(host_id):
     else:
         return jsonify({'status': 'failed', 'message': '失败'})
 
+@sock.route('/ws/terminal/<int:host_id>')
+def terminal_ws(ws, host_id):
+    """处理终端 WebSocket 连接"""
+    host = db.get_host(host_id)
+    if not host:
+        return
+    
+    try:
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(
+            host['address'],
+            port=host['port'],
+            username=host['username'],
+            password=host['password']
+        )
+        
+        # 默认终端大小
+        term_width = 100
+        term_height = 30
+        
+        channel = ssh.invoke_shell(term='xterm-256color', width=term_width, height=term_height)
+        
+        def send_data():
+            while True:
+                try:
+                    if channel.recv_ready():
+                        data = channel.recv(1024).decode('utf-8', errors='ignore')
+                        if data:
+                            ws.send(data)
+                    else:
+                        time.sleep(0.1)
+                except Exception as e:
+                    print(f"Error in send_data: {str(e)}")
+                    break
+        
+        thread = threading.Thread(target=send_data)
+        thread.daemon = True
+        thread.start()
+        
+        while True:
+            try:
+                message = ws.receive()
+                if message is None:
+                    break
+                    
+                data = json.loads(message)
+                if data['type'] == 'input':
+                    channel.send(data['data'])
+                elif data['type'] == 'resize':
+                    # 处理终端大小调整
+                    new_size = data['data']
+                    channel.resize_pty(
+                        width=new_size['cols'],
+                        height=new_size['rows']
+                    )
+            except Exception as e:
+                print(f"Error in receive: {str(e)}")
+                break
+    
+    except Exception as e:
+        app.logger.error(f"Terminal error: {str(e)}")
+    finally:
+        if 'channel' in locals():
+            channel.close()
+        if 'ssh' in locals():
+            ssh.close()
+
+@app.route('/api/sftp/<int:host_id>/list')
+def sftp_list(host_id):
+    """获取 SFTP 文件列表"""
+    path = request.args.get('path', '/')
+    host = db.get_host(host_id)
+    
+    try:
+        with paramiko.SSHClient() as ssh:
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            ssh.connect(
+                host['address'],
+                port=host['port'],
+                username=host['username'],
+                password=host['password']
+            )
+            
+            with ssh.open_sftp() as sftp:
+                file_list = []
+                for entry in sftp.listdir_attr(path):
+                    file_list.append({
+                        'name': entry.filename,
+                        'type': 'directory' if stat.S_ISDIR(entry.st_mode) else 'file',
+                        'size': entry.st_size,
+                        'mtime': entry.st_mtime
+                    })
+                return jsonify(file_list)
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/sftp/<int:host_id>/mkdir', methods=['POST'])
+def sftp_mkdir(host_id):
+    """创建文件夹"""
+    host = db.get_host(host_id)
+    if not host:
+        return jsonify({'error': 'Host not found'}), 404
+
+    try:
+        data = request.json
+        path = data.get('path')
+        if not path:
+            return jsonify({'error': 'Path is required'}), 400
+
+        with paramiko.SSHClient() as ssh:
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            ssh.connect(
+                host['address'],
+                port=host['port'],
+                username=host['username'],
+                password=host['password']
+            )
+            
+            with ssh.open_sftp() as sftp:
+                try:
+                    sftp.stat(path)
+                    return jsonify({'error': 'Directory already exists'}), 400
+                except IOError:
+                    sftp.mkdir(path)
+
+        return jsonify({'success': True})
+    except Exception as e:
+        app.logger.error(f"SFTP mkdir error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/sftp/<int:host_id>/upload', methods=['POST'])
+def sftp_upload(host_id):
+    """处理文件上传"""
+    host = db.get_host(host_id)
+    if not host:
+        return jsonify({'error': 'Host not found'}), 404
+
+    try:
+        path = request.form.get('path', '/')
+        if not request.files:
+            return jsonify({'error': 'No files provided'}), 400
+
+        files = request.files.getlist('files[]')
+        
+        with paramiko.SSHClient() as ssh:
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            ssh.connect(
+                host['address'],
+                port=host['port'],
+                username=host['username'],
+                password=host['password']
+            )
+            
+            with ssh.open_sftp() as sftp:
+                for file in files:
+                    if file.filename:
+                        filename = secure_filename(file.filename)
+                        remote_path = os.path.join(path, filename).replace('\\', '/')
+                        
+                        # 创建临时文件
+                        temp_path = os.path.join('/tmp', filename)
+                        file.save(temp_path)
+                        
+                        try:
+                            # 上传到远程服务器
+                            sftp.put(temp_path, remote_path)
+                        finally:
+                            # 确保临时文件被删除
+                            if os.path.exists(temp_path):
+                                os.remove(temp_path)
+
+        return jsonify({'success': True})
+    except Exception as e:
+        app.logger.error(f"SFTP upload error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/sftp/<int:host_id>/rename', methods=['POST'])
+def sftp_rename(host_id):
+    """重命名文件或文件夹"""
+    host = db.get_host(host_id)
+    if not host:
+        return jsonify({'error': 'Host not found'}), 404
+
+    try:
+        data = request.json
+        old_path = data.get('old_path')
+        new_path = data.get('new_path')
+        
+        if not old_path or not new_path:
+            return jsonify({'error': 'Both old_path and new_path are required'}), 400
+
+        with paramiko.SSHClient() as ssh:
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            ssh.connect(
+                host['address'],
+                port=host['port'],
+                username=host['username'],
+                password=host['password']
+            )
+            
+            with ssh.open_sftp() as sftp:
+                try:
+                    sftp.stat(new_path)
+                    return jsonify({'error': 'Destination already exists'}), 400
+                except IOError:
+                    sftp.rename(old_path, new_path)
+
+        return jsonify({'success': True})
+    except Exception as e:
+        app.logger.error(f"SFTP rename error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/sftp/<int:host_id>/touch', methods=['POST'])
+def sftp_touch(host_id):
+    """创建空文件"""
+    host = db.get_host(host_id)
+    if not host:
+        return jsonify({'error': 'Host not found'}), 404
+
+    try:
+        data = request.json
+        path = data.get('path')
+        
+        if not path:
+            return jsonify({'error': 'Path is required'}), 400
+
+        with paramiko.SSHClient() as ssh:
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            ssh.connect(
+                host['address'],
+                port=host['port'],
+                username=host['username'],
+                password=host['password']
+            )
+            
+            with ssh.open_sftp() as sftp:
+                try:
+                    sftp.stat(path)
+                    return jsonify({'error': 'File already exists'}), 400
+                except IOError:
+                    with sftp.file(path, 'w') as f:
+                        f.write('')
+
+        return jsonify({'success': True})
+    except Exception as e:
+        app.logger.error(f"SFTP touch error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/sftp/<int:host_id>/read')
+def sftp_read(host_id):
+    """读取文件内容"""
+    host = db.get_host(host_id)
+    if not host:
+        return jsonify({'error': 'Host not found'}), 404
+
+    path = request.args.get('path')
+
+    try:
+        with paramiko.SSHClient() as ssh:
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            ssh.connect(
+                host['address'],
+                port=host['port'],
+                username=host['username'],
+                password=host['password']
+            )
+            
+            with ssh.open_sftp() as sftp:
+                with sftp.file(path, 'r') as f:
+                    content = f.read()
+                return content
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/sftp/<int:host_id>/write', methods=['POST'])
+def sftp_write(host_id):
+    """写入文件内容"""
+    host = db.get_host(host_id)
+    if not host:
+        return jsonify({'error': 'Host not found'}), 404
+
+    data = request.json
+    path = data.get('path')
+    content = data.get('content')
+
+    try:
+        with paramiko.SSHClient() as ssh:
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            ssh.connect(
+                host['address'],
+                port=host['port'],
+                username=host['username'],
+                password=host['password']
+            )
+            
+            with ssh.open_sftp() as sftp:
+                with sftp.file(path, 'w') as f:
+                    f.write(content)
+
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/sftp/<int:host_id>/delete', methods=['POST'])
+def sftp_delete(host_id):
+    """删除文件或文件夹"""
+    host = db.get_host(host_id)
+    if not host:
+        return jsonify({'error': 'Host not found'}), 404
+
+    data = request.json
+    path = data.get('path')
+    item_type = data.get('type')
+
+    try:
+        with paramiko.SSHClient() as ssh:
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            ssh.connect(
+                host['address'],
+                port=host['port'],
+                username=host['username'],
+                password=host['password']
+            )
+            
+            with ssh.open_sftp() as sftp:
+                if item_type == 'directory':
+                    # 递归删除文件夹
+                    ssh.exec_command(f'rm -rf "{path}"')
+                else:
+                    sftp.remove(path)
+
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/sftp/<int:host_id>/download')
+def sftp_download(host_id):
+    """下载文件"""
+    host = db.get_host(host_id)
+    if not host:
+        return jsonify({'error': 'Host not found'}), 404
+
+    path = request.args.get('path')
+    filename = os.path.basename(path)
+
+    try:
+        with paramiko.SSHClient() as ssh:
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            ssh.connect(
+                host['address'],
+                port=host['port'],
+                username=host['username'],
+                password=host['password']
+            )
+            
+            with ssh.open_sftp() as sftp:
+                # 创建临时文件
+                temp_path = os.path.join('/tmp', filename)
+                sftp.get(path, temp_path)
+
+                # 读取文件内容并删除临时文件
+                with open(temp_path, 'rb') as f:
+                    content = f.read()
+                os.remove(temp_path)
+
+                # 返回文件
+                response = Response(content)
+                response.headers['Content-Type'] = 'application/octet-stream'
+                response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+                return response
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.errorhandler(404)
 def not_found_error(error):

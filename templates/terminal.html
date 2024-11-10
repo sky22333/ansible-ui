@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SSH终端 - {{host.comment}}</title>
+    <link href="https://cdn.jsdelivr.net/npm/xterm@5.1.0/css/xterm.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/codemirror@5.65.2/lib/codemirror.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/codemirror@5.65.2/theme/monokai.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #1a1b26;
+            --bg-secondary: #1f2335;
+            --bg-tertiary: #24283b;
+            --text-primary: #a9b1d6;
+            --text-secondary: #787c99;
+            --accent-color: #7aa2f7;
+            --border-color: #292e42;
+            --danger-color: #f7768e;
+            --success-color: #9ece6a;
+            --warning-color: #e0af68;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            height: 100vh;
+            overflow: hidden;
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+        }
+        
+        .workspace {
+            display: flex;
+            height: calc(100vh - 56px);
+            transition: all 0.3s ease;
+        }
+        
+        .file-explorer {
+            width: 300px;
+            background-color: var(--bg-secondary);
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--border-color);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+        }
+        
+        .file-explorer.collapsed {
+            width: 0;
+            transform: translateX(-100%);
+        }
+        
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: var(--bg-primary);
+            transition: all 0.3s ease;
+        }
+        
+        .navbar {
+            background-color: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 0.7rem 1rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .navbar-brand {
+            color: var(--text-primary) !important;
+            font-weight: 500;
+        }
+        
+        .file-toolbar {
+            padding: 8px;
+            background-color: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            gap: 8px;
+        }
+        
+        .file-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+        
+        .file-list::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .file-list::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+        }
+        
+        .file-list::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+        
+        .file-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-radius: 6px;
+            color: var(--text-primary);
+            transition: all 0.2s ease;
+            margin-bottom: 2px;
+        }
+        
+        .file-item:hover {
+            background-color: var(--bg-tertiary);
+            transform: translateX(2px);
+        }
+        
+        .file-item.selected {
+            background-color: var(--accent-color);
+            color: #fff;
+        }
+        
+        .file-item i {
+            width: 16px;
+            color: var(--text-secondary);
+            transition: all 0.2s ease;
+        }
+        
+        .file-item:hover i {
+            color: var(--accent-color);
+        }
+        
+        .file-item.directory i {
+            color: var(--warning-color);
+        }
+        
+        .editor-container {
+            display: none;
+            height: 100%;
+            background-color: var(--bg-primary);
+            position: relative;
+            border-radius: 6px;
+            margin: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .editor-toolbar {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            z-index: 10;
+            display: flex;
+            gap: 8px;
+            background-color: var(--bg-tertiary);
+            padding: 6px;
+            border-radius: 6px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            backdrop-filter: blur(10px);
+        }
+        
+        .terminal-container {
+            flex: 1;
+            padding: 12px;
+            background-color: var(--bg-primary);
+            position: relative;
+        }
+        
+        .btn-tool {
+            padding: 6px 12px;
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            border-radius: 6px;
+            transition: all 0.2s ease;
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        }
+        
+        .btn-tool:hover {
+            background-color: var(--accent-color);
+            color: #fff;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+        }
+        
+        .btn-tool:active {
+            transform: translateY(0);
+        }
+        
+        .btn-tool i {
+            font-size: 14px;
+        }
+        
+        .path-bar {
+            padding: 10px 12px;
+            background-color: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+        
+        .path-bar i {
+            color: var(--warning-color);
+        }
+        
+        .context-menu {
+            position: fixed;
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 6px 0;
+            min-width: 180px;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            backdrop-filter: blur(10px);
+            animation: menuFadeIn 0.2s ease;
+        }
+        
+        @keyframes menuFadeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+        
+        .context-menu-item {
+            padding: 8px 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--text-primary);
+            transition: all 0.2s ease;
+        }
+        
+        .context-menu-item:hover {
+            background-color: var(--accent-color);
+            color: #fff;
+        }
+        
+        .context-menu-item i {
+            font-size: 14px;
+            width: 16px;
+            text-align: center;
+        }
+        
+        .upload-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            animation: overlayFadeIn 0.3s ease;
+        }
+        
+        @keyframes overlayFadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+        
+        .upload-dialog {
+            background-color: var(--bg-tertiary);
+            border-radius: 12px;
+            padding: 24px;
+            width: 450px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+            animation: dialogSlideIn 0.3s ease;
+        }
+        
+        @keyframes dialogSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .upload-dropzone {
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+            padding: 24px;
+            text-align: center;
+            margin: 16px 0;
+            transition: all 0.3s ease;
+            background-color: var(--bg-secondary);
+        }
+        
+        .upload-dropzone.dragover {
+            border-color: var(--accent-color);
+            background-color: rgba(122, 162, 247, 0.1);
+            transform: scale(1.02);
+        }
+        
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 6px;
+            position: relative;
+        }
+        
+        .status-connected {
+            background-color: var(--success-color);
+            box-shadow: 0 0 8px var(--success-color);
+        }
+        
+        .status-disconnected {
+            background-color: var(--danger-color);
+            box-shadow: 0 0 8px var(--danger-color);
+        }
+        
+        .upload-progress {
+            margin: 16px 0;
+        }
+        
+        .progress {
+            background-color: var(--bg-secondary);
+            border-radius: 6px;
+            overflow: hidden;
+            height: 8px;
+        }
+        
+        .progress-bar {
+            background-color: var(--accent-color);
+            transition: width 0.3s ease;
+        }
+        
+        .progress-bar-striped {
+            background-image: linear-gradient(
+                45deg,
+                rgba(255, 255, 255, 0.15) 25%,
+                transparent 25%,
+                transparent 50%,
+                rgba(255, 255, 255, 0.15) 50%,
+                rgba(255, 255, 255, 0.15) 75%,
+                transparent 75%,
+                transparent
+            );
+            background-size: 1rem 1rem;
+        }
+        
+        .progress-bar-animated {
+            animation: progress-bar-stripes 1s linear infinite;
+        }
+        
+        @keyframes progress-bar-stripes {
+            from { background-position: 1rem 0; }
+            to { background-position: 0 0; }
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .file-explorer {
+                position: absolute;
+                height: 100%;
+                z-index: 100;
+            }
+            
+            .btn-tool span {
+                display: none;
+            }
+            
+            .upload-dialog {
+                width: 90%;
+                margin: 20px;
+            }
+        }
+
+        /* 自定义滚动条 */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-secondary);
+        }
+
+        /* 终端优化 */
+        .xterm-viewport::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .xterm-viewport::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+
+        .xterm-viewport::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+
+        /* CodeMirror 编辑器优化 */
+        .CodeMirror {
+            height: 100% !important;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            padding: 10px 0;
+        }
+
+        .CodeMirror-gutters {
+            border-right: 1px solid var(--border-color);
+            background-color: var(--bg-secondary);
+        }
+
+        .CodeMirror-linenumber {
+            color: var(--text-secondary);
+        }
+
+        .selected-files {
+            text-align: left;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .file-list-container {
+            background-color: var(--bg-primary);
+            border-radius: 4px;
+            padding: 8px;
+        }
+        
+        .selected-file {
+            padding: 4px 8px;
+            margin-bottom: 4px;
+            border-radius: 4px;
+            background-color: var(--bg-secondary);
+            display: flex;
+            align-items: center;
+            font-size: 0.9em;
+        }
+        
+        .selected-file:last-child {
+            margin-bottom: 0;
+        }
+        
+        .selected-file i {
+            color: var(--text-secondary);
+        }
+        
+        .selected-file .text-muted {
+            color: var(--text-secondary) !important;
+        }
+        
+        .upload-dropzone.has-files {
+            padding: 12px;
+        }
+        
+        .upload-dropzone.has-files > p {
+            margin-bottom: 0;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark">
+        <div class="container-fluid">
+            <span class="navbar-brand">
+                <i class="fas fa-terminal me-2"></i>
+                {{host.comment}} ({{host.address}})
+                <small class="ms-2">
+                    <span id="connectionStatus">
+                        <span class="status-indicator status-disconnected"></span>
+                        未连接
+                    </span>
+                </small>
+            </span>
+            <div class="navbar-nav ms-auto">
+                <button class="btn btn-tool me-2" id="toggleExplorer" title="切换文件浏览器">
+                    <i class="fas fa-folder"></i>
+                </button>
+                <button class="btn btn-tool me-2" id="clearBtn" title="清除终端内容">
+                    <i class="fas fa-eraser"></i>
+                </button>
+                <button class="btn btn-tool" id="reconnectBtn" title="重新连接">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="workspace">
+        <div class="file-explorer" id="fileExplorer">
+            <div class="file-toolbar">
+                <button class="btn btn-tool" id="uploadBtn">
+                    <i class="fas fa-upload"></i> 上传
+                </button>
+                <button class="btn btn-tool" id="newFolderBtn">
+                    <i class="fas fa-folder-plus"></i> 新建文件夹
+                </button>
+                <button class="btn btn-tool" id="newFileBtn">
+                    <i class="fas fa-file-plus"></i> 新建文件
+                </button>
+            </div>
+            <div class="path-bar">
+                <i class="fas fa-folder-open"></i>
+                <span id="currentPath">/</span>
+            </div>
+            <div class="file-list" id="fileList"></div>
+        </div>
+        
+        <div class="main-content">
+            <div class="terminal-container" id="terminal"></div>
+            <div class="editor-container" id="editor">
+                <div class="editor-toolbar">
+                    <button class="btn btn-tool" id="saveFile">
+                        <i class="fas fa-save"></i> 保存
+                    </button>
+                    <button class="btn btn-tool" id="closeEditor">
+                        <i class="fas fa-times"></i> 关闭
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="upload-overlay" id="uploadOverlay">
+        <div class="upload-dialog">
+            <h5>上传文件</h5>
+            <div class="upload-dropzone" id="uploadDropzone">
+                <i class="fas fa-cloud-upload-alt fa-2x mb-2"></i>
+                <p>拖放文件到这里或点击选择文件</p>
+                <input type="file" id="fileInput" multiple style="display: none">
+            </div>
+            <div class="d-flex justify-content-end gap-2 mt-3">
+                <button class="btn btn-secondary" id="cancelUpload">取消</button>
+                <button class="btn btn-primary" id="confirmUpload">上传</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        window.HOST_INFO = {
+            id: {{host.id}},
+            comment: "{{host.comment}}",
+            address: "{{host.address}}",
+            username: "{{host.username}}",
+            port: {{host.port}}
+        };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.1.0/lib/xterm.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.7.0/lib/xterm-addon-fit.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.8.0/lib/xterm-addon-web-links.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.2/lib/codemirror.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.2/mode/javascript/javascript.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.2/mode/xml/xml.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.2/mode/css/css.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.2/mode/python/python.min.js"></script>
+    <script src="/public/terminal.js"></script>
+</body>
+</html> 
