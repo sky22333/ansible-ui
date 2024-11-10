@@ -1,4 +1,3 @@
-# database.py
 import sqlite3
 from contextlib import contextmanager
 import os
@@ -32,6 +31,18 @@ class Database:
                     status TEXT NOT NULL,
                     executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (host_id) REFERENCES hosts (id)
+                )
+            """)
+
+            # 添加访问日志表
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS access_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ip_address TEXT NOT NULL,
+                    path TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    status_code INTEGER NOT NULL,
+                    access_time TIMESTAMP DEFAULT (datetime('now', '+8 hours'))
                 )
             """)
 
@@ -107,7 +118,7 @@ class Database:
     def update_host(self, host_id, host_data):
         """更新主机信息"""
         with self.get_connection() as conn:
-            if host_data.get('password'):  # 如果提供了新密码
+            if host_data.get('password'):
                 conn.execute("""
                     UPDATE hosts 
                     SET comment = ?, address = ?, username = ?, port = ?, password = ?
@@ -120,7 +131,7 @@ class Database:
                     host_data['password'],
                     host_id
                 ))
-            else:  # 如果没有提供新密码，保持原密码不变
+            else:
                 conn.execute("""
                     UPDATE hosts 
                     SET comment = ?, address = ?, username = ?, port = ?
@@ -157,3 +168,34 @@ class Database:
                 LIMIT ?
             """, (limit,))
             return [dict(row) for row in cursor.fetchall()]
+
+    def add_access_log(self, ip_address, path, status, status_code):
+        """添加访问日志"""
+        # 过滤掉内网IP地址
+        if (ip_address.startswith(('10.', '172.', '192.168.')) or 
+            ip_address in ['127.0.0.1', 'localhost']):
+            return
+        
+        with self.get_connection() as conn:
+            conn.execute("""
+                INSERT INTO access_logs (ip_address, path, status, status_code)
+                VALUES (?, ?, ?, ?)
+            """, (ip_address, path, status, status_code))
+
+    def get_access_logs(self, limit=100):
+        """获取访问日志"""
+        with self.get_connection() as conn:
+            cursor = conn.execute("""
+                SELECT * FROM access_logs 
+                ORDER BY access_time DESC 
+                LIMIT ?
+            """, (limit,))
+            return [dict(row) for row in cursor.fetchall()]
+
+    def cleanup_old_logs(self):
+        """清理7天前的日志（使用北京时间）"""
+        with self.get_connection() as conn:
+            conn.execute("""
+                DELETE FROM access_logs 
+                WHERE access_time < datetime('now', '+8 hours', '-7 days')
+            """)

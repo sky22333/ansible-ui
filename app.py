@@ -19,7 +19,7 @@ from werkzeug.utils import secure_filename
 import time
 
 app = Flask(__name__, static_folder='public', static_url_path='/public')
-app.secret_key = secrets.token_hex(16)  # 随机生成会话密钥
+app.secret_key = secrets.token_hex(32)  # 随机生成会话密钥
 db = Database()
 ansible = AnsibleManager(db)
 
@@ -42,9 +42,22 @@ def handle_error(f):
 @app.before_request
 def before_request():
     """检查用户登录状态"""
-    # 如果没有登录且请求不是登录页，则重定向到登录页
-    if request.path != '/api/login' and request.path != '/login' and not session.get('logged_in'):
-        return redirect(url_for('login_page'))
+    if not request.path.startswith(('/public/', '/static/')):
+        if request.path != '/api/login' and request.path != '/login' and not session.get('logged_in'):
+            return redirect(url_for('login_page'))
+
+@app.after_request
+def after_request(response):
+    """记录请求完成后的状态"""
+    if not request.path.startswith(('/public/', '/static/')):
+        status = 'success' if response.status_code < 400 else 'failed'
+        db.add_access_log(
+            request.remote_addr, 
+            request.path, 
+            status,
+            response.status_code
+        )
+    return response
 
 @app.route('/login')
 def login_page():
@@ -389,15 +402,12 @@ def sftp_upload(host_id):
                         filename = secure_filename(file.filename)
                         remote_path = os.path.join(path, filename).replace('\\', '/')
                         
-                        # 创建临时文件
                         temp_path = os.path.join('/tmp', filename)
                         file.save(temp_path)
                         
                         try:
-                            # 上传到远程服务器
                             sftp.put(temp_path, remote_path)
                         finally:
-                            # 确保临时文件被删除
                             if os.path.exists(temp_path):
                                 os.remove(temp_path)
 
@@ -587,16 +597,13 @@ def sftp_download(host_id):
             )
             
             with ssh.open_sftp() as sftp:
-                # 创建临时文件
                 temp_path = os.path.join('/tmp', filename)
                 sftp.get(path, temp_path)
 
-                # 读取文件内容并删除临时文件
                 with open(temp_path, 'rb') as f:
                     content = f.read()
                 os.remove(temp_path)
 
-                # 返回文件
                 response = Response(content)
                 response.headers['Content-Type'] = 'application/octet-stream'
                 response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
@@ -615,6 +622,20 @@ def internal_error(error):
     """处理500错误"""
     return jsonify({'error': 'Internal server error'}), 500
 
+@app.route('/api/access-logs', methods=['GET'])
+@handle_error
+def get_access_logs():
+    """获取访问日志"""
+    logs = db.get_access_logs()
+    return jsonify(logs)
+
+@app.route('/api/access-logs/cleanup', methods=['POST'])
+@handle_error
+def cleanup_logs():
+    """清理旧日志"""
+    db.cleanup_old_logs()
+    return jsonify({'message': '已清理7天前的日志'})
+
 def create_required_directories():
     """创建必要的目录"""
     directories = ['logs', 'data']
@@ -622,10 +643,8 @@ def create_required_directories():
         os.makedirs(directory, exist_ok=True)
 
 if __name__ == '__main__':
-    # 创建必要的目录
     create_required_directories()
-    
-    # 设置日志
+
     import logging
     logging.basicConfig(
         filename='logs/app.log',
@@ -633,5 +652,4 @@ if __name__ == '__main__':
         format='%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
     )
     
-    # 启动应用
     app.run(host='0.0.0.0', port=5000)

@@ -260,4 +260,126 @@ $(document).ready(function() {
 
     // 初始加载
     loadHosts();
+
+    // 将日志按钮添加到导航栏的 Ansible面板 文字旁边
+    $('.navbar-brand').append(`
+        <button class="btn btn-outline-light btn-sm ms-3" style="padding: 0.15rem 0.35rem; font-size: 0.75rem;" id="showLogs">
+            <i class="fas fa-history fa-sm"></i> 访问日志
+        </button>
+        
+        <!-- 日志弹窗 -->
+        <div class="modal fade" id="logsModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content" style="font-size: 0.875rem;">
+                    <div class="modal-header bg-dark text-white py-2">
+                        <h5 class="modal-title" style="font-size: 1rem;">
+                            <i class="fas fa-history"></i> 系统访问日志
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="关闭"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="d-flex gap-2 mb-3">
+                            <button class="btn btn-outline-dark btn-sm" id="cleanupLogs" style="font-size: 0.875rem;">
+                                <i class="fas fa-broom"></i> 清理7天前的日志
+                            </button>
+                            <div class="flex-grow-1 d-flex gap-2">
+                                <input type="text" class="form-control form-control-sm" id="logSearchIP" placeholder="搜索IP" style="max-width: 200px;">
+                                <input type="text" class="form-control form-control-sm" id="logSearchPath" placeholder="搜索路径" style="max-width: 200px;">
+                                <button class="btn btn-outline-primary btn-sm" id="searchLogs">
+                                    <i class="fas fa-search"></i> 搜索
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm" id="resetSearch">
+                                    <i class="fas fa-undo"></i> 重置
+                                </button>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover" style="font-size: 0.875rem;">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>访问时间</th>
+                                        <th>IP地址</th>
+                                        <th>访问路径</th>
+                                        <th>状态码</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="logsTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `);
+
+    // 修改加载访问日志函数，添加过滤功能
+    function loadAccessLogs(ipFilter = '', pathFilter = '') {
+        $.get('/api/access-logs', function(logs) {
+            const tbody = $('#logsTableBody');
+            tbody.empty();
+            
+            logs.filter(log => {
+                return (ipFilter === '' || log.ip_address.includes(ipFilter)) &&
+                       (pathFilter === '' || log.path.includes(pathFilter));
+            }).forEach(function(log) {
+                const date = new Date(log.access_time);
+                const time = new Date(date.getTime()).toLocaleString('zh-CN', { 
+                    timeZone: 'Asia/Shanghai',
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false
+                });
+                
+                // 根据状态码设置颜色
+                const statusClass = log.status_code === 200 ? 'text-success' : 'text-dark';
+                
+                tbody.append(`
+                    <tr>
+                        <td>${time}</td>
+                        <td>${log.ip_address}</td>
+                        <td>${log.path}</td>
+                        <td>
+                            <span class="${statusClass}">
+                                ${log.status_code}
+                            </span>
+                        </td>
+                    </tr>
+                `);
+            });
+        });
+    }
+
+    // 搜索按钮点击事件
+    $('#searchLogs').click(function() {
+        const ipFilter = $('#logSearchIP').val().trim();
+        const pathFilter = $('#logSearchPath').val().trim();
+        loadAccessLogs(ipFilter, pathFilter);
+    });
+
+    // 重置搜索按钮点击事件
+    $('#resetSearch').click(function() {
+        $('#logSearchIP').val('');
+        $('#logSearchPath').val('');
+        loadAccessLogs();
+    });
+
+    // 显示日志弹窗
+    $('#showLogs').click(function() {
+        loadAccessLogs();
+        $('#logsModal').modal('show');
+    });
+
+    // 清理旧日志
+    $('#cleanupLogs').click(function() {
+        if (confirm('确定要清理7天前的日志吗？')) {
+            $.post('/api/access-logs/cleanup', function(response) {
+                alert(response.message);
+                loadAccessLogs();
+            });
+        }
+    });
 });
