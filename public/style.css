@@ -244,7 +244,7 @@
     font-size: 0.75rem !important;
 }
 
-/* 修改命令按钮的颜色 */
+/* 命令按钮的颜色 */
 #sendSingle, #sendAll {
     background-color: #212529;
     border-color: #212529;

@@ -11,7 +11,6 @@ function debounce(func, wait) {
 }
 
 $(document).ready(function() {
-    // 将日志按钮添加到导航栏，修改弹窗样式
     $('.navbar-brand').append(`
         <button class="btn btn-outline-light btn-sm ms-3" style="padding: 0.15rem 0.35rem; font-size: 0.75rem;" id="showLogs">
             <i class="fas fa-history fa-sm"></i> 访问日志
@@ -60,7 +59,6 @@ $(document).ready(function() {
         </div>
     `);
 
-    // 修改加载访问日志函数，添加过滤功能
     function loadAccessLogs(ipFilter = '', pathFilter = '') {
         $.get('/api/access-logs', function(logs) {
             const tbody = $('#logsTableBody');
@@ -100,32 +98,27 @@ $(document).ready(function() {
         });
     }
 
-    // 搜索按钮点击事件
     $('#searchLogs').click(function() {
         const ipFilter = $('#logSearchIP').val().trim();
         const pathFilter = $('#logSearchPath').val().trim();
         loadAccessLogs(ipFilter, pathFilter);
     });
 
-    // 重置搜索按钮点击事件
     $('#resetSearch').click(function() {
         $('#logSearchIP').val('');
         $('#logSearchPath').val('');
         loadAccessLogs();
     });
 
-    // 修改显示日志弹窗的方式
     $('#showLogs').click(function() {
         loadAccessLogs();
         document.getElementById('logsModal').style.display = "block";
     });
 
-    // 添加关闭日志弹窗的功能
     $(document).on('click', '#logsModal .close', function() {
         document.getElementById('logsModal').style.display = "none";
     });
 
-    // 点击日志模态框外部关闭
     $(window).click(function(event) {
         const logsModal = document.getElementById('logsModal');
         if (event.target == logsModal) {
@@ -133,7 +126,6 @@ $(document).ready(function() {
         }
     });
 
-    // 清理旧日志
     $('#cleanupLogs').click(function() {
         if (confirm('确定要清理7天前的日志吗？')) {
             $.post('/api/access-logs/cleanup', function(response) {
@@ -143,7 +135,6 @@ $(document).ready(function() {
         }
     });
 
-    // 加载主机列表
     function loadHosts() {
         $.get('/api/hosts', function(data) {
             $('#hostTable tbody').empty();
@@ -173,7 +164,6 @@ $(document).ready(function() {
         });
     }
 
-    // 简单的格式验证
     function validateHostInput(input) {
         const lines = input.trim().split('\n');
         const errors = [];
@@ -192,7 +182,6 @@ $(document).ready(function() {
         };
     }
 
-    // 批量添加主机
     $('#addHosts').click(function() {
         const inputText = $('#batchInput').val();
         if (!inputText.trim()) {
@@ -200,7 +189,6 @@ $(document).ready(function() {
             return;
         }
 
-        // 验证输入格式
         const validation = validateHostInput(inputText);
         if (!validation.isValid) {
             validation.errors.forEach(error => {
@@ -209,7 +197,6 @@ $(document).ready(function() {
             return;
         }
 
-        // 禁用按钮并更改文字
         const $addButton = $('#addHosts');
         $addButton.prop('disabled', true).text('添加中');
 
@@ -232,13 +219,11 @@ $(document).ready(function() {
                 addLog('添加主机失败: ' + xhr.responseText, 'error');
             },
             complete: function() {
-                // 恢复按钮状态和文字
                 $addButton.prop('disabled', false).text('添加主机');
             }
         });
     });
 
-    // 删除主机
     $(document).on('click', '.delete-host', function() {
         const hostId = $(this).data('id');
         if (confirm('确定要删除这台主机吗？')) {
@@ -256,7 +241,6 @@ $(document).ready(function() {
         }
     });
 
-    // 编辑主机
     $(document).on('click', '.edit-host', function() {
         const hostId = $(this).data('id');
         $.get('/api/hosts/' + hostId, function(host) {
@@ -270,7 +254,6 @@ $(document).ready(function() {
         });
     });
 
-    // 保存主机编辑
     $('#saveHostEdit').click(function() {
         const hostData = {
             id: $('#editHostId').val(),
@@ -297,7 +280,6 @@ $(document).ready(function() {
         });
     });
 
-    // 连通性测试
     $(document).on('click', '.check-host', function() {
         const hostId = $(this).data('id');
         const statusSpan = $(`#health-${hostId}`);
@@ -326,7 +308,6 @@ $(document).ready(function() {
         });
     });
 
-    // 发送命令
     $('#sendSingle').click(function() {
         const command = $('#commandInput').val();
         const selectedHosts = $('#hostSelect').val();
@@ -340,12 +321,10 @@ $(document).ready(function() {
             return;
         }
 
-        // 禁用按钮
         $('#sendSingle').prop('disabled', true);
         $('#sendAll').prop('disabled', true);
 
         executeCommand(command, selectedHosts).always(function() {
-            // 恢复按钮
             $('#sendSingle').prop('disabled', false);
             $('#sendAll').prop('disabled', false);
         });
@@ -358,12 +337,10 @@ $(document).ready(function() {
             return;
         }
 
-        // 禁用按钮
         $('#sendSingle').prop('disabled', true);
         $('#sendAll').prop('disabled', true);
 
         executeCommand(command, 'all').always(function() {
-            // 恢复按钮
             $('#sendSingle').prop('disabled', false);
             $('#sendAll').prop('disabled', false);
         });
@@ -396,16 +373,13 @@ $(document).ready(function() {
         logContainer.scrollTop(logContainer[0].scrollHeight);
     }
 
-    // 添加终端按钮点击事件
     $(document).on('click', '.open-terminal', function() {
         const hostId = $(this).data('id');
         window.open(`/terminal/${hostId}`, '_blank', 'width=1024,height=768');
     });
 
-    // 初始加载
     loadHosts();
 
-    // 在 loadHosts 函数后面添加文件上传相关的代码
     const modal = document.getElementById('uploadModal');
     const uploadSelectedBtn = document.getElementById('uploadSelectedBtn');
     const uploadAllBtn = document.getElementById('uploadAllBtn');
@@ -421,7 +395,6 @@ $(document).ready(function() {
     let currentFile = null;
     let isUploadToSelected = true;
 
-    // 打开模态框
     uploadSelectedBtn.onclick = function() {
         modal.style.display = "block";
         isUploadToSelected = true;
@@ -432,13 +405,11 @@ $(document).ready(function() {
         isUploadToSelected = false;
     }
 
-    // 关闭模态框
     closeBtn.onclick = function() {
         modal.style.display = "none";
         resetUploadUI();
     }
 
-    // 点击模态框外部关闭
     window.onclick = function(event) {
         if (event.target == modal) {
             modal.style.display = "none";
@@ -446,15 +417,12 @@ $(document).ready(function() {
         }
     }
 
-    // 文件选择按钮
     selectFileBtn.onclick = function() {
         fileInput.click();
     }
 
-    // 处理文件选择
     fileInput.onchange = handleFileSelect;
 
-    // 拖放功能
     dropZone.ondragover = function(e) {
         e.preventDefault();
         this.classList.add('dragover');
@@ -474,11 +442,9 @@ $(document).ready(function() {
         }
     }
 
-    // 修改开始上传按钮的处理
     startUploadBtn.onclick = function() {
         if (!currentFile) return;
         
-        // 立即禁用上传按钮并显示上传中状态
         startUploadBtn.disabled = true;
         startUploadBtn.style.backgroundColor = '#6c757d';
         startUploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 上传中...';
@@ -497,14 +463,12 @@ $(document).ready(function() {
             formData.append('hosts', JSON.stringify(selectedHosts));
         }
 
-        // 使用一个标志来防止重复点击
         if (!startUploadBtn.dataset.uploading) {
             startUploadBtn.dataset.uploading = 'true';
             uploadFile(formData);
         }
     };
 
-    // 修改 resetUploadButton 函数，清除上传标志
     function resetUploadButton() {
         if (startUploadBtn) {
             startUploadBtn.disabled = false;
@@ -573,13 +537,11 @@ $(document).ready(function() {
         xhr.send(formData);
     }
 
-    // 修改关闭按钮的事件绑定方式
     $(document).on('click', '#uploadModal .close', function() {
         document.getElementById('uploadModal').style.display = "none";
         resetUploadUI();
     });
 
-    // 修改重置UI函数
     function resetUploadUI() {
         currentFile = null;
         if (fileInput) {

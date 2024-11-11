@@ -43,14 +43,12 @@ class TerminalManager {
         const terminal = document.getElementById('terminal');
         this.term.open(terminal);
         
-        // 设置终端输入处理
         this.term.onData(data => {
             if (this.isConnected && this.socket.readyState === WebSocket.OPEN) {
                 this.socket.send(JSON.stringify({type: 'input', data: data}));
             }
         });
         
-        // 初始化完成后调整大小
         setTimeout(() => {
             this.fitAddon.fit();
             this.term.focus();
@@ -117,13 +115,11 @@ class TerminalManager {
     }
 
     bindEvents() {
-        // 窗口大小改变时调整终端大小
         window.addEventListener('resize', () => {
             this.fitAddon.fit();
             this.updateTerminalSize();
         });
 
-        // 绑定工具栏按钮事件
         document.getElementById('clearBtn').onclick = () => {
             this.term.clear();
             this.term.focus();
@@ -133,12 +129,10 @@ class TerminalManager {
             this.reconnect();
         };
 
-        // 终端大小改变时通知服务器
         this.term.onResize(dimensions => {
             this.updateTerminalSize();
         });
 
-        // 添加键盘快捷键
         document.addEventListener('keydown', (e) => {
             // Ctrl + L 清屏
             if (e.ctrlKey && e.key === 'l') {
@@ -165,7 +159,6 @@ class TerminalManager {
         this.loadFileList();
         this.initUploadHandlers();
         
-        // 绑定文件管理按钮事件
         document.getElementById('toggleExplorer').onclick = () => {
             document.getElementById('fileExplorer').classList.toggle('collapsed');
             setTimeout(() => this.fitAddon.fit(), 300);
@@ -203,8 +196,7 @@ class TerminalManager {
             .then(data => {
                 const fileList = document.getElementById('fileList');
                 fileList.innerHTML = '';
-                
-                // 添加返回上级目录
+
                 if (this.currentPath !== '/') {
                     const backItem = this.createFileItem('..', 'directory');
                     backItem.onclick = () => {
@@ -214,7 +206,6 @@ class TerminalManager {
                     fileList.appendChild(backItem);
                 }
                 
-                // 排序：文件夹在前，文件在后
                 const sortedFiles = data.sort((a, b) => {
                     if (a.type === b.type) return a.name.localeCompare(b.name);
                     return a.type === 'directory' ? -1 : 1;
@@ -225,7 +216,6 @@ class TerminalManager {
                     fileList.appendChild(fileItem);
                 });
 
-                // 更新当前路径显示
                 document.getElementById('currentPath').textContent = this.currentPath;
             })
             .catch(error => console.error('Error loading file list:', error));
@@ -239,10 +229,8 @@ class TerminalManager {
             <span>${name}</span>
         `;
         
-        // 添加点击防抖
         let clickTimeout;
         item.onclick = (e) => {
-            // 清除之前的点击计时器
             if (clickTimeout) {
                 clearTimeout(clickTimeout);
             }
@@ -250,13 +238,10 @@ class TerminalManager {
             clickTimeout = setTimeout(() => {
                 if (type === 'directory') {
                     if (name === '..') {
-                        // 返回上级目录
                         this.currentPath = this.currentPath.split('/').slice(0, -1).join('/') || '/';
                     } else {
-                        // 进入子目录，确保路径不会重复
                         const newPath = this.currentPath === '/' ? 
                             `/${name}` : `${this.currentPath}/${name}`;
-                        // 检查新路径是否与当前路径相同
                         if (this.currentPath !== newPath) {
                             this.currentPath = newPath;
                         }
@@ -265,10 +250,9 @@ class TerminalManager {
                 } else {
                     this.openFile(name);
                 }
-            }, 300); // 300ms 的防抖延迟
+            }, 300);
         };
         
-        // 添加右键菜单
         item.oncontextmenu = (e) => {
             e.preventDefault();
             this.showContextMenu(e, name, type);
@@ -317,13 +301,11 @@ class TerminalManager {
         document.addEventListener('click', () => menu.remove(), { once: true });
     }
 
-    // 添加文件管理相关的方法
     initUploadHandlers() {
         const dropzone = document.getElementById('uploadDropzone');
         const fileInput = document.getElementById('fileInput');
         const uploadOverlay = document.getElementById('uploadOverlay');
 
-        // 拖放上传
         dropzone.ondragover = (e) => {
             e.preventDefault();
             dropzone.classList.add('dragover');
@@ -339,14 +321,11 @@ class TerminalManager {
             this.handleFiles(e.dataTransfer.files);
         };
 
-        // 点击上传
         dropzone.onclick = () => fileInput.click();
         fileInput.onchange = (e) => this.handleFiles(e.target.files);
 
-        // 上传对话框按钮
         document.getElementById('cancelUpload').onclick = () => {
             uploadOverlay.style.display = 'none';
-            // 清除可能存在的进度条
             const progressDiv = uploadOverlay.querySelector('.upload-progress');
             if (progressDiv) {
                 progressDiv.remove();
@@ -365,15 +344,13 @@ class TerminalManager {
         const uploadOverlay = document.getElementById('uploadOverlay');
         const dropzone = document.getElementById('uploadDropzone');
         const fileInput = document.getElementById('fileInput');
-        
-        // 重置文件输入和显示
+
         fileInput.value = '';
         const existingList = dropzone.querySelector('.selected-files');
         if (existingList) {
             existingList.remove();
         }
-        
-        // 重置拖放区域的提示文本
+
         dropzone.querySelector('p').style.display = 'block';
         
         uploadOverlay.style.display = 'flex';
@@ -382,8 +359,7 @@ class TerminalManager {
     handleFiles(files) {
         const fileInput = document.getElementById('fileInput');
         fileInput.files = files;
-        
-        // 显示已选择的文件列表
+
         const dropzone = document.getElementById('uploadDropzone');
         const fileList = document.createElement('div');
         fileList.className = 'selected-files';
@@ -399,14 +375,12 @@ class TerminalManager {
                 `).join('')}
             </div>
         `;
-        
-        // 移除之前的文件列表（如果存在）
+
         const existingList = dropzone.querySelector('.selected-files');
         if (existingList) {
             existingList.remove();
         }
         
-        // 添加新的文件列表
         dropzone.appendChild(fileList);
     }
 
@@ -425,7 +399,6 @@ class TerminalManager {
         }
         formData.append('path', this.currentPath);
 
-        // 创建进度显示元素
         const progressDiv = document.createElement('div');
         progressDiv.className = 'upload-progress';
         progressDiv.innerHTML = `
@@ -438,12 +411,10 @@ class TerminalManager {
                      aria-valuemax="100">0%</div>
             </div>
         `;
-        
-        // 添加进度条到上传对话框
+
         const uploadDialog = document.querySelector('.upload-dialog');
         uploadDialog.insertBefore(progressDiv, uploadDialog.lastElementChild);
 
-        // 使用 XMLHttpRequest 来实现上传进度
         const xhr = new XMLHttpRequest();
         xhr.open('POST', `/api/sftp/${this.hostInfo.id}/upload`, true);
 
@@ -469,7 +440,6 @@ class TerminalManager {
             } else {
                 alert('上传失败: ' + xhr.statusText);
             }
-            // 移除进度条
             progressDiv.remove();
         };
 
@@ -489,18 +459,15 @@ class TerminalManager {
             .then(content => {
                 this.currentFile = path;
                 
-                // 根据文件扩展名设置编辑器模式
                 const extension = name.split('.').pop().toLowerCase();
                 const mode = this.getEditorMode(extension);
                 this.editor.setOption('mode', mode);
-                
-                // 显示编辑器并设置内容
+
                 document.getElementById('terminal').style.display = 'none';
                 document.getElementById('editor').style.display = 'block';
                 this.editor.setValue(content);
                 this.editor.refresh();
-                
-                // 自动调整编辑器大小
+
                 setTimeout(() => this.editor.refresh(), 100);
             })
             .catch(error => {
