@@ -4,7 +4,7 @@
 - 批量执行命令和批量上传文件
 - 快速批量添加主机
 
-1. **Docker部署**：
+1. **Docker快速部署**：
 
 ```
 docker run -d \
@@ -47,6 +47,45 @@ docker run -d \
 | 137    | 进程被杀死                   |
 | 255    | 退出状态未定义               |
 
+
+4：**安全访问**：
+
+生产环境建议用`caddy`反代，并用`caddy`开启白名单访问限制，以下是示例配置：
+```
+services:
+  ansible:
+    image: ghcr.io/sky22333/ansible
+    container_name: ansible
+    environment:
+      - ANSIBLE_HOST_KEY_CHECKING=False
+      - ADMIN_USERNAME=admin123
+      - ADMIN_PASSWORD=admin123
+    volumes:
+      - ./ansible:/app/db
+    restart: always
+
+  caddy:
+    image: caddy:alpine
+    container_name: caddy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+    restart: always
+```
+
+`Caddyfile`白名单示例
+
+```
+example.com {
+    encode gzip
+    whitelist {
+        192.168.1.100
+    }
+    reverse_proxy ansible:5000
+}
+```
 
 
 
