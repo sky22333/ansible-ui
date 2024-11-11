@@ -50,7 +50,7 @@ docker run -d \
 
 4：**安全访问**：
 
-生产环境建议用`caddy`反代，并用`caddy`开启白名单访问限制，以下是`docker-compose`示例配置：
+生产环境建议用`nginx`反代，并用`nginx`开启白名单访问限制，以下是`docker-compose`示例配置：
 ```
 services:
   ansible:
@@ -64,26 +64,34 @@ services:
       - ./ansible:/app/db
     restart: always
 
-  caddy:
-    image: caddy:alpine
-    container_name: caddy
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
     restart: always
 ```
 
-`Caddyfile`白名单示例
+`nginx.conf`白名单示例
 
 ```
-example.com {
-    encode gzip
-    whitelist {
-        192.168.1.100
+server {
+    listen 80;
+    # listen 443 ssl;
+
+    # 允许访问的 IP 地址
+    allow 192.168.0.12;
+    deny all;
+
+    location / {
+        proxy_pass http://ansible:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     }
-    reverse_proxy ansible:5000
 }
 ```
 
