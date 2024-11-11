@@ -503,8 +503,8 @@ $(document).ready(function() {
                 if (response.success) {
                     messageDiv.style.backgroundColor = '#d4edda';
                     messageDiv.style.color = '#155724';
-                    messageDiv.textContent = '文件上传成功！';
-                    addLog('文件上传成功', 'success');
+                    messageDiv.textContent = '文件上传到/tmp目录成功！';
+                    addLog('文件上传到/tmp目录成功', 'success');
                     setTimeout(() => {
                         modal.style.display = "none";
                         resetUploadUI();
