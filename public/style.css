@@ -184,7 +184,6 @@
     color: #333;
 }
 
-/* 日志模态框特定样式 */
 .custom-modal {
     display: none;
     position: fixed;
@@ -244,7 +243,7 @@
     font-size: 0.75rem !important;
 }
 
-/* 命令按钮的颜色 */
+/* 修改命令按钮的颜色 */
 #sendSingle, #sendAll {
     background-color: #212529;
     border-color: #212529;
@@ -253,4 +252,78 @@
 #sendSingle:hover, #sendAll:hover {
     background-color: #343a40;
     border-color: #343a40;
+}
+
+.modal.fade {
+    background-color: rgba(0,0,0,0.5);
+    z-index: 1050;
+}
+
+.modal.fade .modal-dialog {
+    z-index: 1051;
+}
+
+.modal-footer .btn {
+    position: relative;
+    z-index: 1052;
+}
+
+.btn-close {
+    position: relative;
+    z-index: 1052;
+}
+
+.edit-modal-content {
+    width: 60%;
+    max-width: 600px;
+    margin: 5% auto;
+    background-color: #fefefe;
+    padding: 0;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    position: relative;
+    z-index: 1060;
+}
+
+.edit-modal-content .modal-header {
+    padding: 15px 25px;
+    border-bottom: 1px solid #dee2e6;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.edit-modal-content .modal-body {
+    padding: 20px 25px;
+}
+
+.edit-modal-content .modal-footer {
+    padding: 15px 25px;
+    border-top: 1px solid #dee2e6;
+}
+
+.edit-modal-content .form-control {
+    margin-bottom: 10px;
+}
+
+.edit-modal-content .close {
+    font-size: 24px;
+    color: #666;
+    cursor: pointer;
+    transition: color 0.3s;
+}
+
+.edit-modal-content .close:hover {
+    color: #000;
+}
+
+#pingAllHosts {
+    padding: 3px 8px;
+    font-size: 12px;
+    background-color: rgba(47, 50, 54, 0.65);
+    margin-bottom: 5px;
+}
+
+#pingAllHosts:hover {
+    background-color: rgba(33, 37, 41, 0.85);
 }

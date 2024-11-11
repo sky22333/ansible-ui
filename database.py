@@ -34,7 +34,6 @@ class Database:
                 )
             """)
 
-            # 添加访问日志表
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS access_logs (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,

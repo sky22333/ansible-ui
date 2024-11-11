@@ -8,7 +8,6 @@ import secrets
 from flask_sock import Sock
 import paramiko
 import threading
-import pty
 import os
 import select
 import termios
@@ -19,7 +18,7 @@ from werkzeug.utils import secure_filename
 import time
 
 app = Flask(__name__, static_folder='public', static_url_path='/public')
-app.secret_key = secrets.token_hex(32)  # 随机生成会话密钥
+app.secret_key = secrets.token_hex(32)
 db = Database()
 ansible = AnsibleManager(db)
 
@@ -28,9 +27,8 @@ ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'admin')
 
 sock = Sock(app)
 
-# 添加文件上传配置
 UPLOAD_FOLDER = '/tmp/ansible_uploads'
-ALLOWED_EXTENSIONS = set()  # 空集合表示允许所有类型
+ALLOWED_EXTENSIONS = set()
 
 # 确保上传目录存在
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -691,7 +689,7 @@ def upload_file():
                 os.remove(file_path)
             return jsonify({'success': False, 'message': str(e)})
     
-    return jsonify({'success': False, 'message': '不支持的文件类型'})
+    return jsonify({'success': False, 'message': '不支持的文件���型'})
 
 if __name__ == '__main__':
     create_required_directories()

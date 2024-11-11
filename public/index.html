@@ -11,6 +11,7 @@
     <!-- Custom CSS -->
     <link href="/public/style.css" rel="stylesheet">
     <style>
+        /* 允许手动调整大小 */
         #commandInput {
             resize: vertical;
         }
@@ -30,6 +31,7 @@
         </nav>
 
         <div class="row" id="mainContent">
+            <!-- 左侧主机管理面板 -->
             <div class="col-md-6">
                 <div class="card">
                     <div class="card-header">
@@ -43,7 +45,8 @@
                         <button class="btn btn-primary" id="addHosts">添加主机</button>
                         
                         <div class="mt-4">
-                            <h6>主机列表</h6>
+                            <h6 style="display: inline-block; margin-right: 10px;">主机列表</h6>
+                            <button class="small-btn" id="pingAllHosts">ping所有</button>
                             <div class="table-responsive">
                                 <table class="table table-hover" id="hostTable">
                                     <thead>
@@ -100,42 +103,40 @@
         </div>
     </div>
 
-    <div class="modal fade" id="editHostModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">编辑主机</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="editHostForm">
-                        <input type="hidden" id="editHostId">
-                        <div class="mb-3">
-                            <label class="form-label">备注</label>
-                            <input type="text" class="form-control" id="editHostComment">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">地址</label>
-                            <input type="text" class="form-control" id="editHostAddress">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">用户名</label>
-                            <input type="text" class="form-control" id="editHostUsername">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">端口</label>
-                            <input type="number" class="form-control" id="editHostPort">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">密码</label>
-                            <input type="password" class="form-control" id="editHostPassword">
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                    <button type="button" class="btn btn-primary" id="saveHostEdit">保存</button>
-                </div>
+    <div class="modal custom-modal" id="editHostModal" tabindex="-1">
+        <div class="modal-content edit-modal-content">
+            <div class="modal-header">
+                <h2 style="margin: 0; color: #333;">编辑主机</h2>
+                <span class="close" title="关闭">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="editHostForm">
+                    <input type="hidden" id="editHostId">
+                    <div class="mb-3">
+                        <label class="form-label">备注</label>
+                        <input type="text" class="form-control" id="editHostComment" placeholder="请输入备注">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">地址</label>
+                        <input type="text" class="form-control" id="editHostAddress" placeholder="请输入地址">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">用户名</label>
+                        <input type="text" class="form-control" id="editHostUsername" placeholder="请输入用户名">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">端口</label>
+                        <input type="number" class="form-control" id="editHostPort" placeholder="请输入端口">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">密码</label>
+                        <input type="password" class="form-control" id="editHostPassword" placeholder="请输入密码">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary close-edit">取消</button>
+                <button type="button" class="btn btn-primary" id="saveHostEdit">保存</button>
             </div>
         </div>
     </div>
@@ -149,7 +150,7 @@
             <div class="modal-body">
                 <div class="upload-area" id="dropZone">
                     <p><i class="fas fa-cloud-upload-alt" style="font-size: 40px; color: #4CAF50; margin-bottom: 15px;"></i></p>
-                    <p>拖放文件到这里或点击下方按钮选择文件</p>
+                    <p>拖放文件到这里或点击下方按钮文件</p>
                     <input type="file" id="fileInput" style="display: none;">
                     <button id="selectFileBtn"><i class="fas fa-folder-open"></i> 选择文件</button>
                 </div>
@@ -165,7 +166,7 @@
     </div>
 
     <div id="footer">
-        <a href="https://github.com/sky22333/ansible" target="_blank" title="项目地址">
+        <a href="https://github.com/sky22333/ansible" target="_blank" rel="noopener noreferrer" title="项目地址">
             <i class="fab fa-github"></i>
         </a>
     </div>

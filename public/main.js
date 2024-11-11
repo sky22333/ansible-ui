@@ -1,15 +1,3 @@
-function debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-        const later = () => {
-            clearTimeout(timeout);
-            func(...args);
-        };
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-    };
-}
-
 $(document).ready(function() {
     $('.navbar-brand').append(`
         <button class="btn btn-outline-light btn-sm ms-3" style="padding: 0.15rem 0.35rem; font-size: 0.75rem;" id="showLogs">
@@ -150,7 +138,7 @@ $(document).ready(function() {
                         <td>
                             <button class="btn btn-sm btn-primary edit-host" data-id="${host.id}">编辑</button>
                             <button class="btn btn-sm btn-danger delete-host" data-id="${host.id}">删除</button>
-                            <button class="btn btn-sm btn-success check-host" data-id="${host.id}">ping</button>
+                            <button class="btn btn-sm btn-success check-host" data-id="${host.id}">Ping</button>
                             <button class="btn btn-sm btn-info open-terminal" data-id="${host.id}">终端</button>
                             <span class="health-status" id="health-${host.id}"></span>
                         </td>
@@ -250,8 +238,19 @@ $(document).ready(function() {
             $('#editHostUsername').val(host.username);
             $('#editHostPort').val(host.port);
             $('#editHostPassword').val('');
-            $('#editHostModal').modal('show');
+            document.getElementById('editHostModal').style.display = "block";
         });
+    });
+
+    $(document).on('click', '#editHostModal .close, .close-edit', function() {
+        document.getElementById('editHostModal').style.display = "none";
+    });
+
+    $(window).click(function(event) {
+        const editModal = document.getElementById('editHostModal');
+        if (event.target == editModal) {
+            editModal.style.display = "none";
+        }
     });
 
     $('#saveHostEdit').click(function() {
@@ -270,7 +269,7 @@ $(document).ready(function() {
             contentType: 'application/json',
             data: JSON.stringify(hostData),
             success: function() {
-                $('#editHostModal').modal('hide');
+                document.getElementById('editHostModal').style.display = "none";
                 loadHosts();
                 addLog('成功更新主机信息', 'success');
             },
@@ -503,8 +502,8 @@ $(document).ready(function() {
                 if (response.success) {
                     messageDiv.style.backgroundColor = '#d4edda';
                     messageDiv.style.color = '#155724';
-                    messageDiv.textContent = '文件上传到/tmp目录成功！';
-                    addLog('文件上传到/tmp目录成功', 'success');
+                    messageDiv.textContent = '文件上传成功！';
+                    addLog('文件上传成功', 'success');
                     setTimeout(() => {
                         modal.style.display = "none";
                         resetUploadUI();
@@ -554,4 +553,60 @@ $(document).ready(function() {
         }
         resetUploadButton();
     }
+
+    $('#pingAllHosts').click(function() {
+        const hostIds = [];
+        $('#hostTable tbody tr').each(function() {
+            const hostId = $(this).find('.check-host').data('id');
+            if (hostId) {
+                hostIds.push(hostId);
+            }
+        });
+
+        if (hostIds.length === 0) {
+            alert('没有可用的主机');
+            return;
+        }
+        
+        const $button = $(this);
+        $button.prop('disabled', true);
+        $button.html('<i class="fas fa-spinner fa-spin"></i> 检查中...');
+        
+        $('.health-status').text('');
+        
+        let completedRequests = 0;
+
+        hostIds.forEach(function(hostId) {
+            const statusSpan = $(`#health-${hostId}`);
+            statusSpan.text(' 检查中...');
+            
+            $.ajax({
+                url: `/api/hosts/${hostId}/ping`,
+                method: 'GET',
+                success: function(response) {
+                    if (response.status === 'success') {
+                        statusSpan.text(' 连接正常');
+                        statusSpan.css('color', 'green');
+                    } else if (response.status === 'unreachable') {
+                        statusSpan.text(' 无法连接');
+                        statusSpan.css('color', 'red');
+                    } else {
+                        statusSpan.text(' 失败');
+                        statusSpan.css('color', 'orange');
+                    }
+                },
+                error: function() {
+                    statusSpan.text(' 检查失败');
+                    statusSpan.css('color', 'red');
+                },
+                complete: function() {
+                    completedRequests++;
+                    if (completedRequests === hostIds.length) {
+                        $button.prop('disabled', false);
+                        $button.html('Ping所有');
+                    }
+                }
+            });
+        });
+    });
 });
