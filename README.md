@@ -1,6 +1,8 @@
 ### Ansible 批量管理主机面板
 
-- 新增交互式终端页面和文件管理
+- 交互式终端页面和文件管理
+- 批量执行命令和批量上传文件
+- 快速批量添加主机
 
 1. **Docker部署**：
 
@@ -48,5 +50,9 @@ docker run -d \
 
 
 
-   - 数据库存储主机信息和命令日志：`db/ansible.db`
 
+
+---
+
+
+本项目基于ansible项目开发：https://github.com/ansible/ansible
