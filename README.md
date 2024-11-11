@@ -51,7 +51,7 @@ docker run -d \
 
 4：**安全访问**：
 
-生产环境建议用`nginx`反代，并用`nginx`开启白名单访问限制，以下是`docker-compose`示例配置：
+生产环境建议用`nginx`反代，并用`nginx`开启白名单访问限制和`HTTPS`，以下是`docker-compose`示例配置：
 ```
 services:
   ansible:
