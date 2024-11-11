@@ -1,14 +1,14 @@
-FROM python:3.8.20-slim
+FROM python:3.9-alpine
 
 WORKDIR /app
 
 COPY . .
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends openssh-client sshpass && \
-    pip install --no-cache-dir Flask ansible flask-sock paramiko && \
-    rm -rf /var/lib/apt/lists/*
-
+# 安装依赖
+RUN apk update && \
+    apk add --no-cache openssh-client sshpass && \
+    pip install --no-cache-dir -r requirements.txt && \
+    rm -rf /var/cache/apk/*
 
 EXPOSE 5000
 
