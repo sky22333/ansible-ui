@@ -50,7 +50,7 @@ docker run -d \
 
 4：**安全访问**：
 
-生产环境建议用`caddy`反代，并用`caddy`开启白名单访问限制，以下是示例配置：
+生产环境建议用`caddy`反代，并用`caddy`开启白名单访问限制，以下是`docker-compose`示例配置：
 ```
 services:
   ansible:
