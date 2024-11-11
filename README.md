@@ -114,4 +114,4 @@ server {
 ---
 
 
-本项目基于ansible项目开发：https://github.com/ansible/ansible
+本项目基于ansible开发：https://github.com/ansible/ansible
