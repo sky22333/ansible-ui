@@ -1,4 +1,148 @@
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
 $(document).ready(function() {
+    // 将日志按钮添加到导航栏，修改弹窗样式
+    $('.navbar-brand').append(`
+        <button class="btn btn-outline-light btn-sm ms-3" style="padding: 0.15rem 0.35rem; font-size: 0.75rem;" id="showLogs">
+            <i class="fas fa-history fa-sm"></i> 访问日志
+        </button>
+        
+        <!-- 日志弹窗 -->
+        <div id="logsModal" class="modal custom-modal">
+            <div class="modal-content logs-modal-content">
+                <div class="modal-header">
+                    <h2 style="margin: 0; color: #333; font-size: 1.2rem;">
+                        <i class="fas fa-history"></i> 系统访问日志
+                    </h2>
+                    <span class="close" title="关闭">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <div class="d-flex gap-2 mb-3">
+                        <button class="btn btn-outline-dark btn-sm" id="cleanupLogs">
+                            <i class="fas fa-broom"></i> 清理7天前的日志
+                        </button>
+                        <div class="flex-grow-1 d-flex gap-2">
+                            <input type="text" class="form-control form-control-sm" id="logSearchIP" placeholder="搜索IP">
+                            <input type="text" class="form-control form-control-sm" id="logSearchPath" placeholder="搜索路径">
+                            <button class="btn btn-outline-primary btn-sm" id="searchLogs">
+                                <i class="fas fa-search"></i> 搜索
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm" id="resetSearch">
+                                <i class="fas fa-undo"></i> 重置
+                            </button>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>访问时间</th>
+                                    <th>IP地址</th>
+                                    <th>访问路径</th>
+                                    <th>状态码</th>
+                                </tr>
+                            </thead>
+                            <tbody id="logsTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `);
+
+    // 修改加载访问日志函数，添加过滤功能
+    function loadAccessLogs(ipFilter = '', pathFilter = '') {
+        $.get('/api/access-logs', function(logs) {
+            const tbody = $('#logsTableBody');
+            tbody.empty();
+            
+            logs.filter(log => {
+                return (ipFilter === '' || log.ip_address.includes(ipFilter)) &&
+                       (pathFilter === '' || log.path.includes(pathFilter));
+            }).forEach(function(log) {
+                const date = new Date(log.access_time);
+                const time = new Date(date.getTime()).toLocaleString('zh-CN', { 
+                    timeZone: 'Asia/Shanghai',
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false
+                });
+                
+                const statusClass = log.status_code === 200 ? 'text-success' : 'text-dark';
+                
+                tbody.append(`
+                    <tr>
+                        <td>${time}</td>
+                        <td>${log.ip_address}</td>
+                        <td>${log.path}</td>
+                        <td>
+                            <span class="${statusClass}">
+                                ${log.status_code}
+                            </span>
+                        </td>
+                    </tr>
+                `);
+            });
+        });
+    }
+
+    // 搜索按钮点击事件
+    $('#searchLogs').click(function() {
+        const ipFilter = $('#logSearchIP').val().trim();
+        const pathFilter = $('#logSearchPath').val().trim();
+        loadAccessLogs(ipFilter, pathFilter);
+    });
+
+    // 重置搜索按钮点击事件
+    $('#resetSearch').click(function() {
+        $('#logSearchIP').val('');
+        $('#logSearchPath').val('');
+        loadAccessLogs();
+    });
+
+    // 修改显示日志弹窗的方式
+    $('#showLogs').click(function() {
+        loadAccessLogs();
+        document.getElementById('logsModal').style.display = "block";
+    });
+
+    // 添加关闭日志弹窗的功能
+    $(document).on('click', '#logsModal .close', function() {
+        document.getElementById('logsModal').style.display = "none";
+    });
+
+    // 点击日志模态框外部关闭
+    $(window).click(function(event) {
+        const logsModal = document.getElementById('logsModal');
+        if (event.target == logsModal) {
+            logsModal.style.display = "none";
+        }
+    });
+
+    // 清理旧日志
+    $('#cleanupLogs').click(function() {
+        if (confirm('确定要清理7天前的日志吗？')) {
+            $.post('/api/access-logs/cleanup', function(response) {
+                alert(response.message);
+                loadAccessLogs();
+            });
+        }
+    });
+
     // 加载主机列表
     function loadHosts() {
         $.get('/api/hosts', function(data) {
@@ -261,125 +405,191 @@ $(document).ready(function() {
     // 初始加载
     loadHosts();
 
-    // 将日志按钮添加到导航栏的 Ansible面板 文字旁边
-    $('.navbar-brand').append(`
-        <button class="btn btn-outline-light btn-sm ms-3" style="padding: 0.15rem 0.35rem; font-size: 0.75rem;" id="showLogs">
-            <i class="fas fa-history fa-sm"></i> 访问日志
-        </button>
-        
-        <!-- 日志弹窗 -->
-        <div class="modal fade" id="logsModal" tabindex="-1">
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content" style="font-size: 0.875rem;">
-                    <div class="modal-header bg-dark text-white py-2">
-                        <h5 class="modal-title" style="font-size: 1rem;">
-                            <i class="fas fa-history"></i> 系统访问日志
-                        </h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="关闭"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="d-flex gap-2 mb-3">
-                            <button class="btn btn-outline-dark btn-sm" id="cleanupLogs" style="font-size: 0.875rem;">
-                                <i class="fas fa-broom"></i> 清理7天前的日志
-                            </button>
-                            <div class="flex-grow-1 d-flex gap-2">
-                                <input type="text" class="form-control form-control-sm" id="logSearchIP" placeholder="搜索IP" style="max-width: 200px;">
-                                <input type="text" class="form-control form-control-sm" id="logSearchPath" placeholder="搜索路径" style="max-width: 200px;">
-                                <button class="btn btn-outline-primary btn-sm" id="searchLogs">
-                                    <i class="fas fa-search"></i> 搜索
-                                </button>
-                                <button class="btn btn-outline-secondary btn-sm" id="resetSearch">
-                                    <i class="fas fa-undo"></i> 重置
-                                </button>
-                            </div>
-                        </div>
-                        <div class="table-responsive">
-                            <table class="table table-striped table-hover" style="font-size: 0.875rem;">
-                                <thead class="table-dark">
-                                    <tr>
-                                        <th>访问时间</th>
-                                        <th>IP地址</th>
-                                        <th>访问路径</th>
-                                        <th>状态码</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="logsTableBody"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `);
+    // 在 loadHosts 函数后面添加文件上传相关的代码
+    const modal = document.getElementById('uploadModal');
+    const uploadSelectedBtn = document.getElementById('uploadSelectedBtn');
+    const uploadAllBtn = document.getElementById('uploadAllBtn');
+    const closeBtn = document.getElementsByClassName('close')[0];
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const selectFileBtn = document.getElementById('selectFileBtn');
+    const fileInfo = document.getElementById('fileInfo');
+    const fileName = document.getElementById('fileName');
+    const startUploadBtn = document.getElementById('startUploadBtn');
+    const uploadProgress = document.getElementById('uploadProgress');
 
-    // 修改加载访问日志函数，添加过滤功能
-    function loadAccessLogs(ipFilter = '', pathFilter = '') {
-        $.get('/api/access-logs', function(logs) {
-            const tbody = $('#logsTableBody');
-            tbody.empty();
-            
-            logs.filter(log => {
-                return (ipFilter === '' || log.ip_address.includes(ipFilter)) &&
-                       (pathFilter === '' || log.path.includes(pathFilter));
-            }).forEach(function(log) {
-                const date = new Date(log.access_time);
-                const time = new Date(date.getTime()).toLocaleString('zh-CN', { 
-                    timeZone: 'Asia/Shanghai',
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit',
-                    hour12: false
-                });
-                
-                // 根据状态码设置颜色
-                const statusClass = log.status_code === 200 ? 'text-success' : 'text-dark';
-                
-                tbody.append(`
-                    <tr>
-                        <td>${time}</td>
-                        <td>${log.ip_address}</td>
-                        <td>${log.path}</td>
-                        <td>
-                            <span class="${statusClass}">
-                                ${log.status_code}
-                            </span>
-                        </td>
-                    </tr>
-                `);
-            });
-        });
+    let currentFile = null;
+    let isUploadToSelected = true;
+
+    // 打开模态框
+    uploadSelectedBtn.onclick = function() {
+        modal.style.display = "block";
+        isUploadToSelected = true;
     }
 
-    // 搜索按钮点击事件
-    $('#searchLogs').click(function() {
-        const ipFilter = $('#logSearchIP').val().trim();
-        const pathFilter = $('#logSearchPath').val().trim();
-        loadAccessLogs(ipFilter, pathFilter);
-    });
+    uploadAllBtn.onclick = function() {
+        modal.style.display = "block";
+        isUploadToSelected = false;
+    }
 
-    // 重置搜索按钮点击事件
-    $('#resetSearch').click(function() {
-        $('#logSearchIP').val('');
-        $('#logSearchPath').val('');
-        loadAccessLogs();
-    });
+    // 关闭模态框
+    closeBtn.onclick = function() {
+        modal.style.display = "none";
+        resetUploadUI();
+    }
 
-    // 显示日志弹窗
-    $('#showLogs').click(function() {
-        loadAccessLogs();
-        $('#logsModal').modal('show');
-    });
-
-    // 清理旧日志
-    $('#cleanupLogs').click(function() {
-        if (confirm('确定要清理7天前的日志吗？')) {
-            $.post('/api/access-logs/cleanup', function(response) {
-                alert(response.message);
-                loadAccessLogs();
-            });
+    // 点击模态框外部关闭
+    window.onclick = function(event) {
+        if (event.target == modal) {
+            modal.style.display = "none";
+            resetUploadUI();
         }
+    }
+
+    // 文件选择按钮
+    selectFileBtn.onclick = function() {
+        fileInput.click();
+    }
+
+    // 处理文件选择
+    fileInput.onchange = handleFileSelect;
+
+    // 拖放功能
+    dropZone.ondragover = function(e) {
+        e.preventDefault();
+        this.classList.add('dragover');
+    }
+
+    dropZone.ondragleave = function(e) {
+        e.preventDefault();
+        this.classList.remove('dragover');
+    }
+
+    dropZone.ondrop = function(e) {
+        e.preventDefault();
+        this.classList.remove('dragover');
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            handleFile(files[0]);
+        }
+    }
+
+    // 修改开始上传按钮的处理
+    startUploadBtn.onclick = function() {
+        if (!currentFile) return;
+        
+        // 立即禁用上传按钮并显示上传中状态
+        startUploadBtn.disabled = true;
+        startUploadBtn.style.backgroundColor = '#6c757d';
+        startUploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 上传中...';
+        
+        const formData = new FormData();
+        formData.append('file', currentFile);
+        formData.append('uploadType', isUploadToSelected ? 'selected' : 'all');
+        
+        if (isUploadToSelected) {
+            const selectedHosts = $('#hostSelect').val();
+            if (!selectedHosts || selectedHosts.length === 0) {
+                alert('请选择至少一个主机');
+                resetUploadButton();
+                return;
+            }
+            formData.append('hosts', JSON.stringify(selectedHosts));
+        }
+
+        // 使用一个标志来防止重复点击
+        if (!startUploadBtn.dataset.uploading) {
+            startUploadBtn.dataset.uploading = 'true';
+            uploadFile(formData);
+        }
+    };
+
+    // 修改 resetUploadButton 函数，清除上传标志
+    function resetUploadButton() {
+        if (startUploadBtn) {
+            startUploadBtn.disabled = false;
+            startUploadBtn.style.backgroundColor = '#28a745';
+            startUploadBtn.innerHTML = '<i class="fas fa-upload"></i> 开始上传';
+            startUploadBtn.dataset.uploading = '';
+        }
+    }
+
+    function handleFileSelect(e) {
+        const files = e.target.files;
+        if (files.length > 0) {
+            handleFile(files[0]);
+        }
+    }
+
+    function handleFile(file) {
+        currentFile = file;
+        fileName.textContent = file.name;
+        fileInfo.style.display = 'block';
+    }
+
+    function uploadFile(formData) {
+        const xhr = new XMLHttpRequest();
+        const messageDiv = document.createElement('div');
+        messageDiv.style.cssText = 'margin-top: 10px; padding: 10px; border-radius: 4px; text-align: center;';
+        fileInfo.appendChild(messageDiv);
+        
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                const response = JSON.parse(xhr.responseText);
+                if (response.success) {
+                    messageDiv.style.backgroundColor = '#d4edda';
+                    messageDiv.style.color = '#155724';
+                    messageDiv.textContent = '文件上传成功！';
+                    addLog('文件上传成功', 'success');
+                    setTimeout(() => {
+                        modal.style.display = "none";
+                        resetUploadUI();
+                    }, 1500);
+                } else {
+                    messageDiv.style.backgroundColor = '#f8d7da';
+                    messageDiv.style.color = '#721c24';
+                    messageDiv.textContent = '上传失败：' + response.message;
+                    addLog('文件上传失败：' + response.message, 'error');
+                    resetUploadButton();
+                }
+            } else {
+                messageDiv.style.backgroundColor = '#f8d7da';
+                messageDiv.style.color = '#721c24';
+                messageDiv.textContent = '上传失败，请重试';
+                addLog('文件上传失败', 'error');
+                resetUploadButton();
+            }
+        };
+
+        xhr.onerror = function() {
+            messageDiv.style.backgroundColor = '#f8d7da';
+            messageDiv.style.color = '#721c24';
+            messageDiv.textContent = '上传出错，请重试';
+            addLog('文件上传出错', 'error');
+            resetUploadButton();
+        };
+
+        xhr.open('POST', '/upload_file', true);
+        xhr.send(formData);
+    }
+
+    // 修改关闭按钮的事件绑定方式
+    $(document).on('click', '#uploadModal .close', function() {
+        document.getElementById('uploadModal').style.display = "none";
+        resetUploadUI();
     });
+
+    // 修改重置UI函数
+    function resetUploadUI() {
+        currentFile = null;
+        if (fileInput) {
+            fileInput.value = '';
+        }
+        if (fileInfo) {
+            fileInfo.style.display = 'none';
+            const elements = fileInfo.querySelectorAll('div');
+            elements.forEach(el => el.remove());
+        }
+        resetUploadButton();
+    }
 });

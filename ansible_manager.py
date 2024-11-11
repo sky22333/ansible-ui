@@ -264,3 +264,92 @@ class AnsibleManager:
         if host['address'] in results['success']:
             return results['success'][host['address']]
         return None
+
+    def run_playbook(self, play):
+        """运行 playbook"""
+        try:
+            # 初始化必要的对象
+            loader = DataLoader()
+            inventory = InventoryManager(loader=loader, sources=self.generate_inventory(self.db.get_hosts()))
+            variable_manager = VariableManager(loader=loader, inventory=inventory)
+            
+            # 创建回调插件对象
+            results_callback = ResultCallback()
+
+            # 创建任务队列管理器
+            tqm = None
+            try:
+                tqm = TaskQueueManager(
+                    inventory=inventory,
+                    variable_manager=variable_manager,
+                    loader=loader,
+                    passwords=dict(),
+                    stdout_callback=results_callback
+                )
+                # 执行 play
+                for play_item in play:
+                    play_obj = Play().load(play_item, variable_manager=variable_manager, loader=loader)
+                    tqm.run(play_obj)
+            finally:
+                if tqm is not None:
+                    tqm.cleanup()
+
+            return {
+                'success': results_callback.host_ok,
+                'failed': results_callback.host_failed,
+                'unreachable': results_callback.host_unreachable
+            }
+        except Exception as e:
+            raise Exception(f"执行 playbook 失败: {str(e)}")
+
+    def copy_file_to_hosts(self, src, dest, hosts):
+        """复制文件到指定主机"""
+        if not isinstance(hosts, list):
+            hosts = [hosts]
+        
+        # 获取选中主机的地址列表
+        selected_hosts = []
+        all_hosts = self.db.get_hosts()
+        for host in all_hosts:
+            if str(host['id']) in hosts:  # 注意：hosts 是字符串 ID 列表
+                selected_hosts.append(host['address'])
+        
+        if not selected_hosts:
+            raise Exception("没有找到选中的主机")
+        
+        # 使用选中主机的地址列表创建主机组
+        hosts_str = ','.join(selected_hosts)
+        
+        play = [{
+            'name': 'Copy file to selected hosts',
+            'hosts': hosts_str,  # 使用逗号分隔的主机地址列表
+            'gather_facts': 'no',
+            'tasks': [{
+                'name': 'Copy file',
+                'copy': {
+                    'src': src,
+                    'dest': dest,
+                    'mode': '0644'
+                }
+            }]
+        }]
+        
+        return self.run_playbook(play)
+
+    def copy_file_to_all(self, src, dest):
+        """复制文件到所有主机"""
+        play = [{
+            'name': 'Copy file to all hosts',
+            'hosts': 'managed_hosts',
+            'gather_facts': 'no',
+            'tasks': [{
+                'name': 'Copy file',
+                'copy': {
+                    'src': src,
+                    'dest': dest,
+                    'mode': '0644'
+                }
+            }]
+        }]
+        
+        return self.run_playbook(play)

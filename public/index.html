@@ -85,9 +85,11 @@
                                 <!-- 动态填充 -->
                             </select>
                         </div>
-                        <div class="btn-group">
+                        <div class="command-buttons">
                             <button class="btn btn-primary" id="sendSingle">发送到选中主机</button>
                             <button class="btn btn-success" id="sendAll">发送到所有主机</button>
+                            <button class="small-btn" id="uploadSelectedBtn">上传文件到选中</button>
+                            <button class="small-btn" id="uploadAllBtn">上传文件到所有</button>
                         </div>
                         
                         <div class="mt-4">
@@ -138,6 +140,31 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
                     <button type="button" class="btn btn-primary" id="saveHostEdit">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 更新上传模态框 -->
+    <div id="uploadModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 style="margin: 0; color: #333;">文件上传</h2>
+                <span class="close" title="关闭">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="upload-area" id="dropZone">
+                    <p><i class="fas fa-cloud-upload-alt" style="font-size: 40px; color: #4CAF50; margin-bottom: 15px;"></i></p>
+                    <p>拖放文件到这里或点击下方按钮选择文件</p>
+                    <input type="file" id="fileInput" style="display: none;">
+                    <button id="selectFileBtn"><i class="fas fa-folder-open"></i> 选择文件</button>
+                </div>
+                <div id="fileInfo" style="display: none;">
+                    <p>选择的文件: <span id="fileName"></span></p>
+                    <div class="progress-bar">
+                        <div class="progress" id="uploadProgress"></div>
+                    </div>
+                    <button id="startUploadBtn"><i class="fas fa-upload"></i> 开始上传</button>
                 </div>
             </div>
         </div>

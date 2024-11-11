@@ -45,3 +45,212 @@
 .navbar {
     box-shadow: 0 2px 4px rgba(0,0,0,.1);
 }
+
+/* 小按钮样式 */
+.small-btn {
+    padding: 6px 12px;
+    font-size: 13px;
+    margin-left: 8px;
+    background-color: #212529;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.small-btn:hover {
+    background-color: #343a40;
+    transform: translateY(-1px);
+}
+
+.small-btn:active {
+    transform: translateY(0);
+}
+
+/* 模态框样式 */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 10% auto;
+    padding: 25px;
+    border-radius: 8px;
+    width: 50%;
+    max-width: 500px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.close {
+    float: right;
+    font-size: 24px;
+    font-weight: bold;
+    cursor: pointer;
+    color: #666;
+    transition: color 0.3s;
+}
+
+.close:hover {
+    color: #000;
+}
+
+.upload-area {
+    border: 2px dashed #4CAF50;
+    border-radius: 8px;
+    padding: 30px;
+    text-align: center;
+    margin: 20px 0;
+    background-color: #f8f9fa;
+    transition: all 0.3s ease;
+}
+
+.upload-area.dragover {
+    border-color: #45a049;
+    background-color: #e8f5e9;
+    transform: scale(1.02);
+}
+
+.upload-area p {
+    color: #666;
+    margin-bottom: 15px;
+}
+
+#selectFileBtn {
+    background-color: #4CAF50;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.3s;
+}
+
+#selectFileBtn:hover {
+    background-color: #45a049;
+}
+
+#fileInfo {
+    margin-top: 20px;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 10px;
+    background-color: #e9ecef;
+    border-radius: 5px;
+    overflow: hidden;
+    margin: 15px 0;
+}
+
+.progress {
+    width: 0%;
+    height: 100%;
+    background-color: #4CAF50;
+    transition: width 0.3s ease-in-out;
+}
+
+#startUploadBtn {
+    background-color: #28a745;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    width: 100%;
+    margin-top: 10px;
+    transition: background-color 0.3s;
+}
+
+#startUploadBtn:hover {
+    background-color: #218838;
+}
+
+#fileName {
+    font-weight: 500;
+    color: #333;
+}
+
+/* 日志模态框特定样式 */
+.custom-modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    overflow-y: auto;
+}
+
+.logs-modal-content {
+    width: 70%;
+    max-width: 900px;
+    margin: 8% auto;
+    background-color: #fefefe;
+    padding: 0;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.logs-modal-content .modal-header {
+    padding: 15px 25px;
+    border-bottom: 1px solid #dee2e6;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.logs-modal-content .modal-body {
+    padding: 15px 20px;
+}
+
+.table-container {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.table-container table {
+    margin-bottom: 0;
+}
+
+.logs-modal-content .modal-header h2 {
+    font-size: 1rem !important;
+}
+
+.logs-modal-content table {
+    font-size: 0.75rem !important;
+}
+
+.logs-modal-content .btn {
+    font-size: 0.75rem !important;
+}
+
+.logs-modal-content input {
+    font-size: 0.75rem !important;
+}
+
+/* 修改命令按钮的颜色 */
+#sendSingle, #sendAll {
+    background-color: #212529;
+    border-color: #212529;
+}
+
+#sendSingle:hover, #sendAll:hover {
+    background-color: #343a40;
+    border-color: #343a40;
+}

@@ -28,6 +28,17 @@ ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'admin')
 
 sock = Sock(app)
 
+# 添加文件上传配置
+UPLOAD_FOLDER = '/tmp/ansible_uploads'
+ALLOWED_EXTENSIONS = set()  # 空集合表示允许所有类型
+
+# 确保上传目录存在
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+def allowed_file(filename):
+    # 允许所有文件类型
+    return True
+
 def handle_error(f):
     """错误处理装饰器"""
     @wraps(f)
@@ -641,6 +652,46 @@ def create_required_directories():
     directories = ['logs', 'data']
     for directory in directories:
         os.makedirs(directory, exist_ok=True)
+
+@app.route('/upload_file', methods=['POST'])
+def upload_file():
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'message': '没有文件被上传'})
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'success': False, 'message': '没有选择文件'})
+    
+    if file and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
+        upload_type = request.form.get('uploadType')
+        
+        # 保存文件
+        file_path = os.path.join(UPLOAD_FOLDER, filename)
+        file.save(file_path)
+        
+        try:
+            if upload_type == 'selected':
+                hosts = json.loads(request.form.get('hosts', '[]'))
+                if not hosts:
+                    return jsonify({'success': False, 'message': '未选择主机'})
+                # 使用 ansible 实例而不是 ansible_manager
+                result = ansible.copy_file_to_hosts(file_path, f'/tmp/{filename}', hosts)
+            else:
+                # 使用 ansible 实例而不是 ansible_manager
+                result = ansible.copy_file_to_all(file_path, f'/tmp/{filename}')
+            
+            # 删除临时文件
+            os.remove(file_path)
+            
+            return jsonify({'success': True, 'message': '文件上传成功'})
+        except Exception as e:
+            # 确保出错时也删除临时文件
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            return jsonify({'success': False, 'message': str(e)})
+    
+    return jsonify({'success': False, 'message': '不支持的文件类型'})
 
 if __name__ == '__main__':
     create_required_directories()
