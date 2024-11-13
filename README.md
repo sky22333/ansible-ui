@@ -51,7 +51,7 @@ docker run -d \
 
 4：**安全访问**：
 
-生产环境建议用`nginx`反代，并用`nginx`开启白名单访问限制和`HTTPS`，以下是`docker-compose`示例配置：
+生产环境建议用`caddy`反代，并启用IP白名单访问控制，以下是`docker-compose`示例配置：
 ```
 services:
   ansible:
@@ -64,40 +64,37 @@ services:
     volumes:
       - ./ansible:/app/db
     restart: always
-
-  nginx:
-    image: nginx:alpine
-    container_name: nginx
+    
+  caddy:
+    image: ghcr.io/sky22333/caddy
+    container_name: caddy
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./Caddyfile:/etc/caddy/Caddyfile
     restart: always
 ```
 
-`nginx.conf`白名单示例
+`Caddyfile`白名单示例
 
 ```
-server {
-    listen 80;
-    # listen 443 ssl;
+example.com {
+    encode gzip
 
-    # 允许访问的 IP 地址
-    allow 192.168.0.12;
-    deny all;
+    @allowedIPs {
+        remote_ip 192.168.1.10
+        remote_ip 192.168.1.1/20
+    }
 
-    location / {
-        proxy_pass http://ansible:5000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    handle @allowedIPs {
+        reverse_proxy ansible:5000 {
+            websocket
+        }
+    }
 
-        # 支持 WebSocket 连接
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "Upgrade";
-        proxy_read_timeout 86400;
+    handle {
+        respond "Access Denied" 403
     }
 }
 ```
