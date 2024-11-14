@@ -78,6 +78,8 @@ services:
 
 `Caddyfile`白名单示例
 
+> 支持IP段，多个IP用空格分隔
+
 ```
 example.com {
     encode gzip
