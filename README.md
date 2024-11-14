@@ -66,7 +66,7 @@ services:
     restart: always
     
   caddy:
-    image: ghcr.io/sky22333/caddy
+    image: caddy:alpine
     container_name: caddy
     ports:
       - "80:80"
@@ -82,19 +82,15 @@ services:
 example.com {
     encode gzip
 
-    @allowedIPs {
-        remote_ip 192.168.1.10
-        remote_ip 192.168.1.1/20
-    }
-
+    # IP 限制，允许的IP
+    @allowedIPs remote_ip 192.168.1.12
     handle @allowedIPs {
-        reverse_proxy ansible:5000 {
-            websocket
-        }
+        reverse_proxy ansible:5000
     }
 
+    # 默认拒绝所有其他 IP
     handle {
-        respond "Access Denied" 403
+        respond "Access denied" 403
     }
 }
 ```
