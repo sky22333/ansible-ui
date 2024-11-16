@@ -109,7 +109,7 @@ example.com {
 ---
 
 
-本项目基于ansible开发：https://github.com/ansible/ansible
+- 感谢[ansible](https://github.com/ansible/ansible)
 
 **免责申明：代码写的很烂，生产环境慎重使用，造成的各种后果本人概不负责。**
 
