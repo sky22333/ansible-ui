@@ -109,7 +109,12 @@ example.com {
 ---
 
 
-- 感谢[ansible](https://github.com/ansible/ansible)
+### 本项目使用了以下开源库：
+
+- **[Flask](https://flask.palletsprojects.com/)**
+- **[Ansible](https://www.ansible.com/)**
+- **[Flask-Sock](https://flask-sock.readthedocs.io/)**
+- **[Paramiko](https://www.paramiko.org/)**
 
 **免责申明：代码写的很烂，生产环境慎重使用，造成的各种后果本人概不负责。**
 
