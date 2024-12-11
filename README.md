@@ -112,10 +112,10 @@ example.com {
 
 ### 本项目使用了以下开源库：
 
-- **[Flask](https://flask.palletsprojects.com/)**
-- **[Ansible](https://www.ansible.com/)**
-- **[Flask-Sock](https://flask-sock.readthedocs.io/)**
-- **[Paramiko](https://www.paramiko.org/)**
+- [Flask](https://flask.palletsprojects.com/)
+- [Ansible](https://www.ansible.com/)
+- [Flask-Sock](https://flask-sock.readthedocs.io/)
+- [Paramiko](https://www.paramiko.org/)
 
 ---
 
