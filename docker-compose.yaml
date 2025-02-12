@@ -8,4 +8,4 @@ services:
       - ADMIN_USERNAME=admin123
       - ADMIN_PASSWORD=admin123
     volumes:
-      - ./db:/app/db
+      - ./ansible:/app/db
