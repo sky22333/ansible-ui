@@ -103,7 +103,7 @@ example.com {
 
 ### 预览
 
-<img src="https://github.com/sky22333/ansible/blob/340c84adcf2ade357e646626dc3602f74cf108a1/.github/workflows/test.png" alt="PC截图" width="900">
+<img src="https://cdn.jsdelivr.net/gh/sky22333/ansible@main/.github/workflows/test.png" alt="PC截图" width="900">
 
 
 
