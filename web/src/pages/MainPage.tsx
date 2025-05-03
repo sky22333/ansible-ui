@@ -16,13 +16,6 @@ import FileUpload from '@/components/FileUpload';
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth, authStorage } from '@/contexts/AuthContext';
 import { TerminalIcon } from 'lucide-react';
-import { useAuthChecker } from '@/contexts/AuthContext';
-import moment from 'moment';
-import {
-  Tabs, TabsContent, TabsList, TabsTrigger,
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-  CardFooter
-} from "@/components/ui";
 import PlaybookExecutor from '@/components/PlaybookExecutor';
 
 // Define Host type based on backend API
