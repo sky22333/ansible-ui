@@ -18,6 +18,20 @@ import datetime
 import logging
 from crypto_utils import CryptoUtils, set_crypto_keys, derive_key_from_credentials
 
+# 新增获取客户端真实IP的函数
+def get_client_ip():
+    """获取客户端真实IP地址
+    优先从代理转发的头信息中获取真实IP，如不存在则返回直连IP
+    """
+    # 尝试从常见的代理头中获取
+    if request.headers.get('X-Forwarded-For'):
+        # 取列表中第一个IP(通常是原始客户端)
+        return request.headers.get('X-Forwarded-For').split(',')[0].strip()
+    elif request.headers.get('X-Real-IP'):
+        return request.headers.get('X-Real-IP')
+    # 如果没有代理头，则使用直接IP
+    return request.remote_addr
+
 app = Flask(__name__, static_folder='public', static_url_path='')
 app.secret_key = secrets.token_hex(32)
 # 设置令牌过期时间为5小时
@@ -160,7 +174,7 @@ def after_request(response):
     if request.path.startswith("/api/"):
         status = 'success' if response.status_code < 400 else 'failed'
         db.add_access_log(
-            request.remote_addr, 
+            get_client_ip(),  # 使用新函数获取真实IP，代替原来的request.remote_addr
             request.path, 
             status,
             response.status_code

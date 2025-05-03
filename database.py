@@ -199,10 +199,10 @@ class Database:
 
     def add_access_log(self, ip_address, path, status, status_code):
         """添加访问日志"""
-        # 过滤掉内网IP地址
-        if (ip_address.startswith(('10.', '172.', '192.168.')) or 
-            ip_address in ['127.0.0.1', 'localhost']):
-            return
+        # 注释掉内网IP过滤，确保记录所有来源IP，包括通过代理转发的
+        # if (ip_address.startswith(('10.', '172.', '192.168.')) or 
+        #     ip_address in ['127.0.0.1', 'localhost']):
+        #     return
         
         with self.get_connection() as conn:
             conn.execute("""
