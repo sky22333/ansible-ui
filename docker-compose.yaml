@@ -1,0 +1,11 @@
+services:
+  app:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - ANSIBLE_HOST_KEY_CHECKING=False
+      - ADMIN_USERNAME=admin123
+      - ADMIN_PASSWORD=admin123
+    volumes:
+      - ./ansible:/app/db

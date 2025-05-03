@@ -1,0 +1,5 @@
+Flask==3.0.3
+ansible==6.7.0
+flask-sock==0.7.0
+paramiko==3.5.0
+PyJWT>=2.4.0,<3.0
