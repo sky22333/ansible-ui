@@ -1,10 +1,9 @@
-# Ansible React 前端重构项目
+# Ansible 前端重构
 
 ## 概述
 
 本项目是对原有 Ansible Web UI 的前端进行了重构，采用了 React 和 shadcn/ui 技术栈，旨在提供更现代化、响应式和美观的用户界面。
 
-**重要提示：** 后端代码保持不变。此 React 前端项目旨在完全替代原有的 `ansible-main/public` 目录下的静态文件。
 
 ## 技术栈
 
@@ -34,7 +33,6 @@ ansible-react-frontend/
 │   ├── App.tsx         # 应用主组件，处理路由
 │   ├── index.css       # 全局样式 (Tailwind CSS 基础样式)
 │   └── main.tsx        # 应用入口点
-├── .env                # 环境变量 (可选, 例如 API 基础 URL)
 ├── index.html          # HTML 入口文件
 ├── package.json        # 项目依赖和脚本
 ├── pnpm-lock.yaml      # 依赖锁定文件
