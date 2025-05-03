@@ -16,6 +16,14 @@ import FileUpload from '@/components/FileUpload';
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth, authStorage } from '@/contexts/AuthContext';
 import { TerminalIcon } from 'lucide-react';
+import { useAuthChecker } from '@/contexts/AuthContext';
+import moment from 'moment';
+import {
+  Tabs, TabsContent, TabsList, TabsTrigger,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  CardFooter
+} from "@/components/ui";
+import PlaybookExecutor from '@/components/PlaybookExecutor';
 
 // Define Host type based on backend API
 interface Host {
@@ -56,6 +64,8 @@ function MainPage() {
   const [uploadTarget, setUploadTarget] = useState<'selected' | 'all' | null>(null);
   const [isBatchAddOpen, setIsBatchAddOpen] = useState(false); // Control batch add dialog
   const [isAuthChecking, setIsAuthChecking] = useState(true); // 新增：认证检查状态
+  const [isPlaybookDialogOpen, setIsPlaybookDialogOpen] = useState(false);
+  const [playbookTarget, setPlaybookTarget] = useState<'selected' | 'all' | null>(null);
   
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
@@ -366,6 +376,23 @@ function MainPage() {
     }
   };
 
+  const openPlaybookDialog = (target: 'selected' | 'all') => {
+    if (target === 'selected' && selectedHostIds.length === 0) {
+      toast.error("错误", { description: "请选择要执行任务的主机" });
+      return;
+    }
+    if (target === 'all' && hosts.length === 0) {
+      toast.error("错误", { description: "没有主机可供执行任务" });
+      return;
+    }
+    setPlaybookTarget(target);
+    setIsPlaybookDialogOpen(true);
+  };
+  
+  const handlePlaybookComplete = () => {
+    console.log("Playbook execution complete");
+  };
+
   const isAllSelected = hosts.length > 0 && selectedHostIds.length === hosts.length;
   const isIndeterminate = selectedHostIds.length > 0 && selectedHostIds.length < hosts.length;
 
@@ -496,6 +523,16 @@ function MainPage() {
                   </DialogContent>
                 </Dialog>
                 <div className="flex gap-2">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="outline" size="sm" 
+                        disabled={selectedHostIds.length === 0} 
+                        onClick={() => openPlaybookDialog('selected')}>
+                        <PlayIcon className="mr-2 h-4 w-4" /> 执行任务
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent><p>在选中的主机上执行自定义任务</p></TooltipContent>
+                  </Tooltip>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button variant="outline" size="sm" 
@@ -715,6 +752,26 @@ function MainPage() {
                     />
                 )}
             </DialogContent>
+        </Dialog>
+        
+        {/* Playbook Execution Dialog */}
+        <Dialog open={isPlaybookDialogOpen} onOpenChange={setIsPlaybookDialogOpen}>
+          <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>执行Ansible Playbook</DialogTitle>
+              <DialogDescription>
+                在 {playbookTarget === 'all' ? '所有主机' : '选定主机'} 上执行自定义Playbook。
+              </DialogDescription>
+            </DialogHeader>
+            
+            {playbookTarget && (
+              <PlaybookExecutor
+                targetHostIds={playbookTarget === 'all' ? 'all' : selectedHostIds}
+                onExecutionComplete={handlePlaybookComplete}
+                onClose={() => setIsPlaybookDialogOpen(false)}
+              />
+            )}
+          </DialogContent>
         </Dialog>
 
       </div>

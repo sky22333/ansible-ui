@@ -10,6 +10,9 @@ from ansible import context
 from ansible.module_utils.common.collections import ImmutableDict
 import tempfile
 import json
+import subprocess
+import threading
+import re
 
 class ResultCallback(CallbackBase):
     """自定义回调类来处理任务结果"""
@@ -379,3 +382,103 @@ class AnsibleManager:
             return result
         except Exception as e:
             raise Exception(f"复制文件失败: {str(e)}")
+
+    def execute_custom_playbook(self, playbook_content, target_hosts=None):
+        """执行自定义Playbook"""
+        # 创建临时playbook文件
+        fd, playbook_path = tempfile.mkstemp(prefix='ansible_playbook_', suffix='.yml')
+        with os.fdopen(fd, 'w') as f:
+            f.write(playbook_content)
+        
+        try:
+            # 创建临时输出文件
+            output_file = tempfile.mktemp(prefix='ansible_output_')
+            
+            # 如果提供了特定主机，则生成临时inventory
+            inventory_option = []
+            if target_hosts:
+                inventory_path = self.generate_inventory(target_hosts)
+                inventory_option = ['-i', inventory_path]
+            
+            # 构建ansible-playbook命令
+            cmd = ['ansible-playbook', playbook_path] + inventory_option + ['-v']
+            
+            # 创建日志处理函数和回调
+            logs = []
+            log_lock = threading.Lock()
+            
+            def process_output(process):
+                for line in iter(process.stdout.readline, b''):
+                    decoded_line = line.decode('utf-8').rstrip()
+                    with log_lock:
+                        logs.append(decoded_line)
+            
+            # 执行命令，实时捕获输出
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                universal_newlines=False
+            )
+            
+            # 启动线程处理输出
+            output_thread = threading.Thread(target=process_output, args=(process,))
+            output_thread.daemon = True
+            output_thread.start()
+            
+            # 等待命令执行完成
+            process.wait()
+            output_thread.join()
+            
+            # 解析结果
+            result = {
+                'success': process.returncode == 0,
+                'return_code': process.returncode,
+                'logs': logs,
+                'summary': self._parse_playbook_result(logs)
+            }
+            
+            return result
+        
+        finally:
+            # 清理临时文件
+            os.remove(playbook_path)
+            if target_hosts:
+                os.remove(inventory_path)
+    
+    def _parse_playbook_result(self, logs):
+        """解析Playbook执行结果，生成主机成功/失败统计"""
+        summary = {
+            'success': [],
+            'failed': [],
+            'unreachable': []
+        }
+        
+        # 正则表达式匹配成功、失败和不可达的主机
+        success_pattern = re.compile(r'([\w\.-]+)\s+:\s+ok=\d+')
+        failed_pattern = re.compile(r'([\w\.-]+)\s+:\s+.*failed=([1-9]\d*)')
+        unreachable_pattern = re.compile(r'([\w\.-]+)\s+:\s+.*unreachable=([1-9]\d*)')
+        
+        for line in logs:
+            # 检查成功的主机
+            success_match = success_pattern.search(line)
+            if success_match and not failed_pattern.search(line) and not unreachable_pattern.search(line):
+                host = success_match.group(1)
+                if host not in summary['success']:
+                    summary['success'].append(host)
+            
+            # 检查失败的主机
+            failed_match = failed_pattern.search(line)
+            if failed_match:
+                host = failed_match.group(1)
+                if host not in summary['failed']:
+                    summary['failed'].append(host)
+            
+            # 检查不可达的主机
+            unreachable_match = unreachable_pattern.search(line)
+            if unreachable_match:
+                host = unreachable_match.group(1)
+                if host not in summary['unreachable']:
+                    summary['unreachable'].append(host)
+        
+        return summary

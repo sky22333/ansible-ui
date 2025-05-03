@@ -1076,6 +1076,60 @@ def get_ws_token(host_id):
         
     return jsonify({'token': token})
 
+@app.route('/api/playbook/execute', methods=['POST'])
+@handle_error
+@auth_required
+def execute_playbook():
+    """执行用户自定义的Ansible Playbook"""
+    data = request.json
+    playbook_content = data.get('playbook')
+    host_ids = data.get('host_ids', [])
+    
+    # 验证输入
+    if not playbook_content:
+        return jsonify({'error': '未提供Playbook内容'}), 400
+    
+    # 如果指定了主机ID，则获取这些主机的信息
+    target_hosts = None
+    if host_ids:
+        target_hosts = [db.get_host(host_id) for host_id in host_ids]
+        # 过滤掉不存在的主机
+        target_hosts = [host for host in target_hosts if host]
+    
+    # 执行Playbook
+    try:
+        result = ansible.execute_custom_playbook(playbook_content, target_hosts)
+        
+        # 记录执行日志
+        # 如果有指定主机，则为每个主机记录一条日志
+        if target_hosts:
+            for host in target_hosts:
+                host_status = 'success'
+                if host['address'] in result['summary']['failed']:
+                    host_status = 'failed'
+                elif host['address'] in result['summary']['unreachable']:
+                    host_status = 'unreachable'
+                
+                db.log_command(
+                    host['id'],
+                    'Custom Playbook Execution',
+                    json.dumps({'playbook_logs': result['logs']}),
+                    host_status
+                )
+        else:
+            # 如果没有指定主机，则记录一个通用日志
+            db.log_command(
+                None,
+                'Custom Playbook Execution',
+                json.dumps({'playbook_logs': result['logs']}),
+                'success' if result['success'] else 'failed'
+            )
+        
+        return jsonify(result)
+    except Exception as e:
+        app.logger.error(f"Playbook执行错误: {str(e)}")
+        return jsonify({'error': f'Playbook执行失败: {str(e)}'}), 500
+
 if __name__ == '__main__':
     create_required_directories()
 
