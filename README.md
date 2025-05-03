@@ -21,53 +21,17 @@
 - **无默认凭证**：系统强制要求设置管理员环境变量，不使用任何默认值或备用方案
 
 ## 安装
-
-### 下载
 ```
-git clone -b dev https://github.com/sky22333/ansible.git
+docker run -d \
+  --name ansible \
+  -p 5000:5000 \
+  -e ANSIBLE_HOST_KEY_CHECKING=False \
+  -e ADMIN_USERNAME=admin123 \
+  -e ADMIN_PASSWORD=admin123 \
+  -v ./ansible:/app/db \
+  ghcr.io/sky22333/ansible
 ```
-
-### 后端
-
-1. **设置管理员凭证（必需）**
-   
-   必须通过环境变量设置管理员用户名和密码:
-   
-   ```bash
-   # Linux/macOS
-   export ADMIN_USERNAME="your_admin_username"
-   export ADMIN_PASSWORD="your_admin_password"
-   
-   # Windows
-   set ADMIN_USERNAME=your_admin_username
-   set ADMIN_PASSWORD=your_admin_password
-   ```
-   
-   **注意**: 未设置这些环境变量将导致系统无法正常运行
-
-2. 安装Python依赖
-   ```
-   pip install -r requirements.txt
-   ```
-
-3. 运行后端服务
-   ```
-   python app.py
-   ```
-
-### 前端
-1. 安装依赖
-   ```
-   cd web
-   pnpm i
-   ```
-
-2. 构建
-   ```
-   pnpm run build
-   ```
-
-3. 将`dist`下的所有文件复制到`public`目录
+默认仅支持HTTPS访问，请自行反代。请务必设置一个强密码
 
 ## 注意事项
 
@@ -75,4 +39,37 @@ git clone -b dev https://github.com/sky22333/ansible.git
 - **密钥生成**：系统完全依赖管理员凭证派生加密密钥，无任何本地密钥文件
 - **密码更改**：如果修改了管理员密码，之前加密的数据将无法解密，请在修改密码前备份重要数据
 - **会话限制**：加密密钥仅在登录会话中有效，如果服务重启，需要重新登录才能访问加密数据
-- **推荐环境**：Python 3.9+和最新版本的Ansible
+
+
+## 预览
+
+![1](./.github/workflows/1.jpg)
+
+---
+
+![2](./.github/workflows/2.jpg)
+
+---
+
+![3](./.github/workflows/3.jpg)
+
+---
+
+![4](./.github/workflows/4.jpg)
+
+---
+
+![5](./.github/workflows/5.jpg)
+
+---
+
+![6](./.github/workflows/6.jpg)
+
+---
+
+![7](./.github/workflows/7.jpg)
+
+---
+
+![8](./.github/workflows/8.jpg)
+
