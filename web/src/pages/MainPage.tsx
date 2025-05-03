@@ -15,7 +15,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import FileUpload from '@/components/FileUpload';
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth, authStorage } from '@/contexts/AuthContext';
-import { TerminalIcon } from 'lucide-react';
+import { TerminalIcon, Github } from 'lucide-react';
 import PlaybookExecutor from '@/components/PlaybookExecutor';
 import { prepareHostData } from '@/utils/crypto';
 
@@ -469,7 +469,7 @@ function MainPage() {
                 </div>
               </div>
               <SheetFooter>
-                <Button variant="destructive" onClick={handleCleanupAccessLogs}>清理7天前日志</Button>
+                <Button variant="outline" onClick={handleCleanupAccessLogs} className="text-black dark:text-white">清理7天前日志</Button>
                 <SheetClose asChild>
                   <Button variant="outline">关闭</Button>
                 </SheetClose>
@@ -770,6 +770,18 @@ function MainPage() {
           </DialogContent>
         </Dialog>
 
+        {/* GitHub Link */}
+        <div className="text-center mt-6 mb-2">
+          <a 
+            href="https://github.com/sky22333/ansible" 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
+            title="GitHub仓库"
+          >
+            <Github size={16} />
+          </a>
+        </div>
       </div>
     </TooltipProvider>
   );
