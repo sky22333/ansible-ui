@@ -36,7 +36,7 @@ class CryptoUtils:
         # 这里设置临时值，将在用户登录时被覆盖
         # 注意：这些临时密钥无法解密任何数据，只是为了避免程序错误
         self.salt = b"temporary_salt_will_be_replaced"
-        self.key = b"temporary_key_will_be_replaced_after_login"
+        self.key = os.urandom(32)  # 确保临时密钥也是正确长度：32字节 = 256位
         
         # 将临时密钥存储到全局变量中
         CRYPTO_KEY = self.key
@@ -111,6 +111,10 @@ def set_crypto_keys(key, salt):
         key = base64.b64decode(key)
     if isinstance(salt, str):
         salt = base64.b64decode(salt)
+    
+    # 确保密钥长度正确
+    if len(key) != 32:
+        raise ValueError("AES-GCM密钥必须是256位(32字节)")
         
     CRYPTO_KEY = key
     CRYPTO_SALT = salt
@@ -131,13 +135,16 @@ def derive_key_from_credentials(username, password):
     # 从用户名派生盐值，确保相同用户名始终生成相同的盐值
     salt = hashlib.sha256(username.encode('utf-8')).digest()[:16]
     
-    # 使用PBKDF2派生密钥
+    # 使用PBKDF2派生密钥，确保输出长度为32字节(256位)
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
-        length=32,
+        length=32,  # 明确指定输出长度为32字节(256位)
         salt=salt,
         iterations=100000,
     )
     key = kdf.derive(combined)
+    
+    # 确认密钥长度为32字节(256位)
+    assert len(key) == 32, "派生的密钥长度必须为256位(32字节)"
     
     return key, salt 

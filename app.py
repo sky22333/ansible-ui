@@ -88,16 +88,21 @@ def auth_required(f):
             return jsonify({'error': 'Invalid or expired token'}), 401
         
         # 在每次API调用时，如果没有设置加密密钥，则从用户凭证派生
-        global CRYPTO_KEY, CRYPTO_SALT
         # 这里从crypto_utils导入全局变量
         from crypto_utils import CRYPTO_KEY, CRYPTO_SALT
         
-        if (not CRYPTO_KEY or not CRYPTO_SALT or 
-            CRYPTO_KEY == b"temporary_key_will_be_replaced_after_login") and ADMIN_USERNAME and ADMIN_PASSWORD:
+        # 检查密钥是否有效或需要重新派生
+        if (CRYPTO_KEY is None or 
+            isinstance(CRYPTO_KEY, bytes) and (len(CRYPTO_KEY) != 32 or CRYPTO_KEY == os.urandom(32))) and ADMIN_USERNAME and ADMIN_PASSWORD:
             # 只有在设置了环境变量时才尝试派生密钥
-            app.logger.info("API调用中检测到加密密钥未设置，尝试从用户凭证派生")
-            key, salt = derive_key_from_credentials(ADMIN_USERNAME, ADMIN_PASSWORD)
-            set_crypto_keys(key, salt)
+            app.logger.info("API调用中检测到加密密钥未设置或无效，尝试从用户凭证派生")
+            try:
+                key, salt = derive_key_from_credentials(ADMIN_USERNAME, ADMIN_PASSWORD)
+                set_crypto_keys(key, salt)
+                app.logger.info("密钥派生成功，长度为: %d 字节", len(key))
+            except Exception as e:
+                app.logger.error(f"密钥派生失败: {str(e)}")
+                return jsonify({'error': '系统加密配置错误，请联系管理员'}), 500
             
         # 将用户信息添加到request中，以便视图函数使用
         request.user = user
@@ -177,35 +182,40 @@ def login():
 
     if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
         # 从用户凭证派生加密密钥
-        key, salt = derive_key_from_credentials(username, password)
-        
-        # 设置全局加密密钥
-        set_crypto_keys(key, salt)
-        app.logger.info("已从用户凭证成功派生加密密钥")
-        
-        # 生成JWT令牌
-        token = generate_token('admin')
-        
-        # 创建包含token的响应
-        response_data = {'success': True, 'message': '登录成功', 'token': token}
-        response = jsonify(response_data)
-        
-        # 将token也存在cookie中，方便前端获取
-        # secure=True表示只在HTTPS连接中发送
-        # httponly=True表示JavaScript不能访问cookie，增加安全性
-        # samesite='Lax'防止CSRF攻击
-        response.set_cookie(
-            'token', 
-            token, 
-            max_age=JWT_EXPIRATION, 
-            httponly=True,
-            secure=True,  
-            samesite='Lax'
-        )
-        
-        return response
+        try:
+            key, salt = derive_key_from_credentials(username, password)
+            
+            # 设置全局加密密钥
+            set_crypto_keys(key, salt)
+            app.logger.info(f"已从用户凭证成功派生加密密钥，长度为: {len(key)} 字节")
+            
+            # 生成JWT令牌
+            token = generate_token('admin')
+            
+            # 创建包含token的响应
+            response_data = {'success': True, 'message': '登录成功', 'token': token}
+            response = jsonify(response_data)
+            
+            # 将token也存在cookie中，方便前端获取
+            # secure=True表示只在HTTPS连接中发送
+            # httponly=True表示JavaScript不能访问cookie，增加安全性
+            # samesite='Lax'防止CSRF攻击
+            response.set_cookie(
+                'token', 
+                token, 
+                max_age=JWT_EXPIRATION, 
+                # secure=True,  # 开发环境可能不需要
+                httponly=True,
+                samesite='Lax'
+            )
+            
+            return response
+        except Exception as e:
+            app.logger.error(f"密钥派生失败: {str(e)}")
+            return jsonify({'success': False, 'message': '登录失败，系统加密配置错误'}), 500
     else:
-        return jsonify({'success': False, 'message': '用户名或密码错误'})
+        app.logger.warning(f"登录失败，用户名或密码不正确: {username}")
+        return jsonify({'success': False, 'message': '用户名或密码不正确'}), 401
 
 
 @app.route('/', defaults={'path': ''})
