@@ -112,7 +112,7 @@ function TerminalPage() {
       socket.current.onopen = () => {
         setIsConnected(true);
         setIsConnecting(false);
-        term.current?.write('\r\n\x1b[1;32m*** 连接成功 ***\x1b[0m\r\n');
+        term.current?.write('\r\n\x1b[1;32m 正在连接主机终端 \x1b[0m\r\n');
         // Fit terminal on connect and send initial size
         fitAddon.current?.fit(); 
         sendResize();
