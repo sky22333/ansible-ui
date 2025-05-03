@@ -16,6 +16,7 @@ import hashlib
 import jwt
 import datetime
 import logging
+from crypto_utils import CryptoUtils, set_crypto_keys, derive_key_from_credentials
 
 app = Flask(__name__, static_folder='public', static_url_path='')
 app.secret_key = secrets.token_hex(32)
@@ -24,10 +25,15 @@ JWT_EXPIRATION = 5 * 60 * 60  # 5小时，以秒为单位
 JWT_SECRET = app.secret_key
 db = Database()
 ansible = AnsibleManager(db)
+crypto = CryptoUtils()
 
 # 账号密码变量
 ADMIN_USERNAME = os.getenv('ADMIN_USERNAME')
 ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD')
+
+# 检查必要的环境变量
+if not ADMIN_USERNAME or not ADMIN_PASSWORD:
+    app.logger.warning("未设置管理员凭证环境变量(ADMIN_USERNAME/ADMIN_PASSWORD)，请设置这些环境变量以确保系统安全")
 
 # 配置WebSocket
 sock = Sock(app)
@@ -80,6 +86,18 @@ def auth_required(f):
         user = decode_token(token)
         if not user:
             return jsonify({'error': 'Invalid or expired token'}), 401
+        
+        # 在每次API调用时，如果没有设置加密密钥，则从用户凭证派生
+        global CRYPTO_KEY, CRYPTO_SALT
+        # 这里从crypto_utils导入全局变量
+        from crypto_utils import CRYPTO_KEY, CRYPTO_SALT
+        
+        if (not CRYPTO_KEY or not CRYPTO_SALT or 
+            CRYPTO_KEY == b"temporary_key_will_be_replaced_after_login") and ADMIN_USERNAME and ADMIN_PASSWORD:
+            # 只有在设置了环境变量时才尝试派生密钥
+            app.logger.info("API调用中检测到加密密钥未设置，尝试从用户凭证派生")
+            key, salt = derive_key_from_credentials(ADMIN_USERNAME, ADMIN_PASSWORD)
+            set_crypto_keys(key, salt)
             
         # 将用户信息添加到request中，以便视图函数使用
         request.user = user
@@ -158,6 +176,13 @@ def login():
         return jsonify({'success': False, 'message': '系统配置错误'}), 500
 
     if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+        # 从用户凭证派生加密密钥
+        key, salt = derive_key_from_credentials(username, password)
+        
+        # 设置全局加密密钥
+        set_crypto_keys(key, salt)
+        app.logger.info("已从用户凭证成功派生加密密钥")
+        
         # 生成JWT令牌
         token = generate_token('admin')
         
@@ -218,7 +243,12 @@ def get_hosts():
     """获取所有主机列表"""
     hosts = db.get_hosts()
     for host in hosts:
+        # 不返回明文密码到前端，但保留加密形式用于识别
+        host['is_password_encrypted'] = crypto.is_encrypted(host['encrypted_password'])
         host['password'] = '********'
+        # 删除不需要返回的字段
+        if 'encrypted_password' in host:
+            del host['encrypted_password']
     return jsonify(hosts)
 
 @app.route('/api/hosts/<int:host_id>', methods=['GET'])
@@ -228,7 +258,12 @@ def get_host(host_id):
     """获取单个主机信息"""
     host = db.get_host(host_id)
     if host:
+        # 不返回明文密码到前端，但保留加密形式用于识别
+        host['is_password_encrypted'] = crypto.is_encrypted(host['encrypted_password'])
         host['password'] = '********'
+        # 删除不需要返回的字段
+        if 'encrypted_password' in host:
+            del host['encrypted_password']
         return jsonify(host)
     return jsonify({'error': 'Host not found'}), 404
 
@@ -425,12 +460,15 @@ def terminal_ws(ws, host_id):
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         
+        # 确保使用解密后的密码
+        password = host['password']
+        
         app.logger.info(f"正在连接SSH")
         ssh.connect(
             host['address'],
             port=host['port'],
             username=host['username'],
-            password=host['password'],
+            password=password,
             timeout=10
         )
         

@@ -13,6 +13,7 @@ import json
 import subprocess
 import threading
 import re
+from crypto_utils import CryptoUtils
 
 class ResultCallback(CallbackBase):
     """自定义回调类来处理任务结果"""
@@ -34,6 +35,7 @@ class ResultCallback(CallbackBase):
 class AnsibleManager:
     def __init__(self, db):
         self.db = db
+        self.crypto = CryptoUtils()
         context.CLIARGS = ImmutableDict(
             connection='smart',
             module_path=None,
@@ -50,8 +52,14 @@ class AnsibleManager:
         """生成临时 inventory 文件"""
         inventory_content = ["[managed_hosts]"]
         for host in hosts:
+            # 确保使用解密后的密码
+            password = host.get('password')
+            # 如果密码是加密的，解密它
+            if isinstance(password, str) and password.startswith("ENC:"):
+                password = self.crypto.decrypt(password)
+                
             line = f"{host['address']} ansible_user={host['username']} "
-            line += f"ansible_port={host['port']} ansible_ssh_pass={host['password']} "
+            line += f"ansible_port={host['port']} ansible_ssh_pass={password} "
             line += "ansible_ssh_common_args='-o StrictHostKeyChecking=no'"
             inventory_content.append(line)
 

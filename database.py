@@ -1,10 +1,12 @@
 import sqlite3
 from contextlib import contextmanager
 import os
+from crypto_utils import CryptoUtils
 
 class Database:
     def __init__(self, db_path="db/ansible.db"):
         self.db_path = db_path
+        self.crypto = CryptoUtils()
         self.init_database()
 
     def init_database(self):
@@ -74,6 +76,8 @@ class Database:
     def add_host(self, host_data):
         """添加单个主机"""
         with self.get_connection() as conn:
+            # 加密密码后存储
+            encrypted_password = self.crypto.encrypt(host_data['password'])
             cursor = conn.execute("""
                 INSERT INTO hosts (comment, address, username, port, password)
                 VALUES (?, ?, ?, ?, ?)
@@ -82,42 +86,64 @@ class Database:
                 host_data['address'],
                 host_data['username'],
                 host_data['port'],
-                host_data['password']
+                encrypted_password
             ))
             return cursor.lastrowid
 
     def add_hosts_batch(self, hosts_data):
         """批量添加主机"""
         with self.get_connection() as conn:
+            # 加密每个主机的密码
+            encrypted_hosts = []
+            for host in hosts_data:
+                encrypted_hosts.append((
+                    host['comment'],
+                    host['address'],
+                    host['username'],
+                    host['port'],
+                    self.crypto.encrypt(host['password'])
+                ))
+                
             cursor = conn.executemany("""
                 INSERT INTO hosts (comment, address, username, port, password)
                 VALUES (?, ?, ?, ?, ?)
-            """, [(
-                host['comment'],
-                host['address'],
-                host['username'],
-                host['port'],
-                host['password']
-            ) for host in hosts_data])
+            """, encrypted_hosts)
             return cursor.rowcount
 
     def get_hosts(self):
         """获取所有主机"""
         with self.get_connection() as conn:
             cursor = conn.execute("SELECT * FROM hosts ORDER BY created_at DESC")
-            return [dict(row) for row in cursor.fetchall()]
+            hosts = [dict(row) for row in cursor.fetchall()]
+            
+            # 处理返回的主机数据，解密密码
+            for host in hosts:
+                # 保留一个加密版本的密码，供前端识别是否需要重新输入
+                host['encrypted_password'] = host['password']
+                # 解密密码供后端使用
+                host['password'] = self.crypto.decrypt(host['password'])
+            return hosts
 
     def get_host(self, host_id):
         """获取单个主机信息"""
         with self.get_connection() as conn:
             cursor = conn.execute("SELECT * FROM hosts WHERE id = ?", (host_id,))
             row = cursor.fetchone()
-            return dict(row) if row else None
+            if row:
+                host = dict(row)
+                # 保留一个加密版本的密码，供前端识别是否需要重新输入
+                host['encrypted_password'] = host['password']
+                # 解密密码供后端使用
+                host['password'] = self.crypto.decrypt(host['password'])
+                return host
+            return None
 
     def update_host(self, host_id, host_data):
         """更新主机信息"""
         with self.get_connection() as conn:
             if host_data.get('password'):
+                # 确保更新时加密新密码
+                encrypted_password = self.crypto.encrypt(host_data['password'])
                 conn.execute("""
                     UPDATE hosts 
                     SET comment = ?, address = ?, username = ?, port = ?, password = ?
@@ -127,7 +153,7 @@ class Database:
                     host_data['address'],
                     host_data['username'],
                     host_data['port'],
-                    host_data['password'],
+                    encrypted_password,
                     host_id
                 ))
             else:

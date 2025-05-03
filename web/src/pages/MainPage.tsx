@@ -17,6 +17,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth, authStorage } from '@/contexts/AuthContext';
 import { TerminalIcon } from 'lucide-react';
 import PlaybookExecutor from '@/components/PlaybookExecutor';
+import { prepareHostData } from '@/utils/crypto';
 
 // Define Host type based on backend API
 interface Host {
@@ -27,6 +28,7 @@ interface Host {
   port: number;
   password?: string;
   status?: 'checking' | 'success' | 'unreachable' | 'failed' | null;
+  is_password_encrypted?: boolean;
 }
 
 // Define Access Log type
@@ -162,7 +164,9 @@ function MainPage() {
     }
     setIsAddingHost(true);
     try {
-        const response = await api.post('/api/hosts/batch', hostsData);
+        // 对每个主机数据进行处理
+        const processedHostsData = hostsData.map(host => prepareHostData(host));
+        const response = await api.post('/api/hosts/batch', processedHostsData);
         toast.success("成功", { description: response.data.message || `成功添加 ${response.data.count} 台主机` });
         setBatchInput('');
         fetchHosts();
@@ -185,10 +189,9 @@ function MainPage() {
     if (!editingHost) return;
     setIsEditingHost(true);
     try {
-      const dataToSend: Partial<Host> = { ...editedHost };
-      if (!editedHost.password || editedHost.password === '********') {
-        delete dataToSend.password;
-      }
+      // 处理主机数据，特别是密码字段
+      const dataToSend = prepareHostData(editedHost, editingHost);
+      
       await api.put(`/api/hosts/${editingHost.id}`, dataToSend);
       toast.success("成功", { description: "主机信息已更新" });
       setEditingHost(null);
