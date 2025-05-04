@@ -45,7 +45,7 @@ class AnsibleManager:
             become_user=None,
             check=False,
             diff=False,
-            verbosity=3
+            verbosity=0
         )
 
     def generate_inventory(self, hosts):
