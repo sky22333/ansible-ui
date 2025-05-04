@@ -143,3 +143,35 @@
   }
 }
 
+/* 自定义弹窗滚动条样式 */
+/* 隐藏所有弹窗内容的滚动条，但保留滚动功能 */
+.DialogContent .overflow-y-auto,
+.SheetContent .overflow-y-auto,
+[data-slot="dialog-content"] .overflow-y-auto,
+[data-slot="sheet-content"] .overflow-y-auto,
+[data-slot="dialog-content"] [class*="overflow-y-auto"],
+[data-slot="sheet-content"] [class*="overflow-y-auto"],
+.bg-muted\/90 .overflow-y-auto,
+.DialogContent .max-h-40,
+.SheetContent .max-h-40,
+.DialogContent .h-\[200px\],
+.SheetContent .h-\[200px\] {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+/* 隐藏 WebKit 浏览器的滚动条 */
+.DialogContent .overflow-y-auto::-webkit-scrollbar,
+.SheetContent .overflow-y-auto::-webkit-scrollbar,
+[data-slot="dialog-content"] .overflow-y-auto::-webkit-scrollbar,
+[data-slot="sheet-content"] .overflow-y-auto::-webkit-scrollbar,
+[data-slot="dialog-content"] [class*="overflow-y-auto"]::-webkit-scrollbar,
+[data-slot="sheet-content"] [class*="overflow-y-auto"]::-webkit-scrollbar,
+.bg-muted\/90 .overflow-y-auto::-webkit-scrollbar,
+.DialogContent .max-h-40::-webkit-scrollbar,
+.SheetContent .max-h-40::-webkit-scrollbar,
+.DialogContent .h-\[200px\]::-webkit-scrollbar,
+.SheetContent .h-\[200px\]::-webkit-scrollbar {
+  display: none;
+}
+
