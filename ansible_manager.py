@@ -39,13 +39,13 @@ class AnsibleManager:
         context.CLIARGS = ImmutableDict(
             connection='smart',
             module_path=None,
-            forks=10,
+            forks=30,
             become=None,
             become_method=None,
             become_user=None,
             check=False,
             diff=False,
-            verbosity=0
+            verbosity=3
         )
 
     def generate_inventory(self, hosts):
