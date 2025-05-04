@@ -157,7 +157,10 @@
 .DialogContent .h-\[200px\],
 .SheetContent .h-\[200px\],
 /* 添加对整个Playbook执行弹窗的处理 */
-.dialog-content-scroll-hide {
+.dialog-content-scroll-hide,
+/* 添加对批量添加主机Textarea的处理 */
+.DialogContent textarea,
+.batch-input-textarea {
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* IE and Edge */
 }
@@ -175,7 +178,10 @@
 .DialogContent .h-\[200px\]::-webkit-scrollbar,
 .SheetContent .h-\[200px\]::-webkit-scrollbar,
 /* 添加对整个Playbook执行弹窗的处理 */
-.dialog-content-scroll-hide::-webkit-scrollbar {
+.dialog-content-scroll-hide::-webkit-scrollbar,
+/* 添加对批量添加主机Textarea的处理 */
+.DialogContent textarea::-webkit-scrollbar,
+.batch-input-textarea::-webkit-scrollbar {
   display: none;
 }
 

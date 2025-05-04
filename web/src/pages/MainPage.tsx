@@ -491,7 +491,7 @@ function MainPage() {
                   <DialogTrigger asChild>
                     <Button><PlusCircledIcon className="mr-2 h-4 w-4" /> 批量添加主机</Button>
                   </DialogTrigger>
-                  <DialogContent className="sm:max-w-[600px]">
+                  <DialogContent className="sm:max-w-[600px] dialog-content-scroll-hide">
                     <DialogHeader>
                       <DialogTitle>批量添加主机</DialogTitle>
                       <DialogDescription>
@@ -505,7 +505,7 @@ function MainPage() {
                         rows={5}
                         value={batchInput}
                         onChange={(e) => setBatchInput(e.target.value)}
-                        className="placeholder:opacity-40"
+                        className="placeholder:opacity-40 batch-input-textarea"
                       />
                     </div>
                     <DialogFooter>
