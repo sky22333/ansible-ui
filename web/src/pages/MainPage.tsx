@@ -752,7 +752,7 @@ function MainPage() {
         
         {/* Playbook Execution Dialog */}
         <Dialog open={isPlaybookDialogOpen} onOpenChange={setIsPlaybookDialogOpen}>
-          <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+          <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto dialog-content-scroll-hide">
             <DialogHeader>
               <DialogTitle>执行Ansible Playbook</DialogTitle>
               <DialogDescription>
