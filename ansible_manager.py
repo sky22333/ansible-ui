@@ -335,7 +335,7 @@ class AnsibleManager:
         
         play = [{
             'name': 'Copy file to selected hosts',
-            'hosts': hosts_str,  # 使用逗号分隔的主机地址列表
+            'hosts': hosts_str,
             'gather_facts': 'no',
             'tasks': [{
                 'name': 'Ensure destination directory exists',

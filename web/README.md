@@ -1,8 +1,6 @@
-# Ansible 前端重构
-
 ## 概述
 
-本项目是对原有 Ansible Web UI 的前端进行了重构，采用了 React 和 shadcn/ui 技术栈，旨在提供更现代化、响应式和美观的用户界面。
+新版前端，采用了 React 和 shadcn/ui 技术栈，旨在提供更现代化、响应式和美观的用户界面。
 
 
 ## 技术栈
@@ -10,7 +8,6 @@
 *   React
 *   TypeScript
 *   shadcn/ui (基于 Radix UI 和 Tailwind CSS)
-*   Vite (由 `create_react_app` 模板提供)
 *   pnpm (包管理器)
 *   axios (HTTP 请求)
 *   react-router-dom (路由)

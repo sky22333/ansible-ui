@@ -165,16 +165,12 @@ def before_request():
 
 @app.after_request
 def after_request(response):
-    # 移除允许所有来源的CORS头
-    # response.headers.add('Access-Control-Allow-Origin', '*')
-    # response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-    # response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
     
     # 记录API请求
     if request.path.startswith("/api/"):
         status = 'success' if response.status_code < 400 else 'failed'
         db.add_access_log(
-            get_client_ip(),  # 使用新函数获取真实IP，代替原来的request.remote_addr
+            get_client_ip(),
             request.path, 
             status,
             response.status_code
@@ -218,7 +214,7 @@ def login():
                 'token', 
                 token, 
                 max_age=JWT_EXPIRATION, 
-                # secure=True,  # 开发环境可能不需要
+                # secure=True, # 生产环境建议开启
                 httponly=True,
                 samesite='Lax'
             )
@@ -537,7 +533,6 @@ def terminal_ws(ws, host_id):
                 if data['type'] == 'input':
                     channel.send(data['data'])
                 elif data['type'] == 'resize':
-                    # 处理终端大小调整
                     new_size = data['data']
                     channel.resize_pty(
                         width=new_size['cols'],
