@@ -1,6 +1,6 @@
 # Ansible Web管理面板
 
-基于Flask和React的Ansible Web管理界面，提供主机管理、命令执行、文件传输和Web终端等功能。
+轻量级，简单易用的Ansible Web管理面板，提供批量主机管理、命令执行、文件传输和Web终端等功能。适合小白用户。
 
 ## 功能特性
 
