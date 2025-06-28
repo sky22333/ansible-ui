@@ -2,6 +2,8 @@
 
 轻量级，简单易用的Ansible Web管理面板，提供批量主机管理、命令执行、文件传输和Web终端等功能。适合小白用户。
 
+![Visitors](https://count.getloli.com/get/@sky22333.ansible?theme=rule34)
+
 ## 功能特性
 
 - 主机管理：批量添加主机
