@@ -72,3 +72,6 @@ docker run -d \
 
 ![8](./.github/workflows/8.jpg)
 
+---
+
+[![Star History Chart](https://api.star-history.com/svg?repos=sky22333/ansible&type=Date)](https://www.star-history.com/#sky22333/ansible&Date)
