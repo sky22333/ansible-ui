@@ -79,4 +79,5 @@ docker run -d \
 
 ---
 
-[![Star History Chart](https://api.star-history.com/svg?repos=sky22333/ansible&type=Date)](https://www.star-history.com/#sky22333/ansible&Date)
+## Stargazers over time
+[![Stargazers over time](https://starchart.cc/sky22333/ansible.svg?variant=adaptive)](https://starchart.cc/sky22333/ansible)
