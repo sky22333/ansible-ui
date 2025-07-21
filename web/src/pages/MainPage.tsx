@@ -30,6 +30,7 @@ interface Host {
   password?: string;
   status?: 'checking' | 'success' | 'unreachable' | 'failed' | null;
   is_password_encrypted?: boolean;
+  auth_method?: 'password' | 'key';
 }
 
 // Define Access Log type
