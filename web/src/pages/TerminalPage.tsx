@@ -212,9 +212,27 @@ function TerminalPage() {
     terminal.open(terminalRef.current);
 
     // Handle data input from terminal
+    terminal.onKey(({ key, domEvent }) => {
+      if (domEvent.ctrlKey && domEvent.key === 'c') {
+        // 捕获 Ctrl+C，发送中断信号
+        if (socket.current?.readyState === WebSocket.OPEN) {
+          socket.current.send(JSON.stringify({ type: 'input', data: '\x03' }));
+        }
+      } else {
+        // 其他按键正常发送
+        if (socket.current?.readyState === WebSocket.OPEN) {
+          socket.current.send(JSON.stringify({ type: 'input', data: key }));
+        }
+      }
+    });
+
     terminal.onData((data) => {
+      // onData is still useful for paste events
       if (socket.current?.readyState === WebSocket.OPEN) {
-        socket.current.send(JSON.stringify({ type: 'input', data: data }));
+        // We check if the event was a single key press that we already handled
+        if (data.length > 1) {
+            socket.current.send(JSON.stringify({ type: 'input', data: data }));
+        }
       }
     });
 

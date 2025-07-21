@@ -7,6 +7,12 @@ class Database:
     def __init__(self, db_path="db/ansible.db"):
         self.db_path = db_path
         self.crypto = CryptoUtils()
+
+        # 判断父目录是否存在，不存在则创建
+        db_dir = os.path.dirname(self.db_path)
+        if not os.path.exists(db_dir):
+            os.makedirs(db_dir, exist_ok=True)
+
         self.init_database()
 
     def init_database(self):
