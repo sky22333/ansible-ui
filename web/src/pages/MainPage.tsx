@@ -18,6 +18,7 @@ import { useAuth, authStorage } from '@/contexts/AuthContext';
 import { TerminalIcon, Github } from 'lucide-react';
 import PlaybookExecutor from '@/components/PlaybookExecutor';
 import { prepareHostData } from '@/utils/crypto';
+import { Switch } from "@/components/ui/switch";
 
 // Define Host type based on backend API
 interface Host {
@@ -61,6 +62,7 @@ function MainPage() {
   const [isAuthChecking, setIsAuthChecking] = useState(true); // 新增：认证检查状态
   const [isPlaybookDialogOpen, setIsPlaybookDialogOpen] = useState(false);
   const [playbookTarget, setPlaybookTarget] = useState<'selected' | 'all' | null>(null);
+  const [useKeyAuth, setUseKeyAuth] = useState(false);
   
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
@@ -139,18 +141,27 @@ function MainPage() {
     const lines = batchInput.trim().split('\n');
     const hostsData: Omit<Host, 'id'>[] = [];
     const errors: string[] = [];
+    const expectedParts = useKeyAuth ? 4 : 5;
+    const formatString = useKeyAuth ? "'备注 地址 用户名 端口'" : "'备注 地址 用户名 端口 密码'";
+
     lines.forEach((line, index) => {
         if (line.trim() === '') return;
         const parts = line.trim().split(/\s+/);
-        if (parts.length !== 5) {
-            errors.push(`第${index + 1}行：格式错误，应为 '备注 地址 用户名 端口 密码'`);
+        if (parts.length !== expectedParts) {
+            errors.push(`第${index + 1}行：格式错误，应为 ${formatString}`);
         } else {
             const [comment, address, username, portStr, password] = parts;
             const port = parseInt(portStr, 10);
             if (isNaN(port)) {
                 errors.push(`第${index + 1}行：端口号 '${portStr}' 无效`);
             } else {
-                hostsData.push({ comment, address, username, port, password });
+                hostsData.push({ 
+                    comment, 
+                    address, 
+                    username, 
+                    port, 
+                    password: useKeyAuth ? '' : password 
+                });
             }
         }
     });
@@ -281,7 +292,8 @@ function MainPage() {
   const handleSelectAllHosts = (checked: boolean | 'indeterminate') => {
     if (checked === true) {
       setSelectedHostIds(hosts.map(h => h.id));
-    } else {
+    }
+    else {
       setSelectedHostIds([]);
     }
   };
@@ -487,37 +499,51 @@ function MainPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex flex-col sm:flex-row justify-between items-center gap-2 mb-2">
-                <Dialog open={isBatchAddOpen} onOpenChange={setIsBatchAddOpen}>
-                  <DialogTrigger asChild>
-                    <Button><PlusCircledIcon className="mr-2 h-4 w-4" /> 批量添加主机</Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-[600px] dialog-content-scroll-hide">
-                    <DialogHeader>
-                      <DialogTitle>批量添加主机</DialogTitle>
-                      <DialogDescription>
-                        每行输入一台主机信息，格式：备注 地址 用户名 端口 SSH密码。例如：<br />
-                        <code>1 192.168.1.1 root 22 yourpassword</code>
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                      <Textarea
-                        placeholder="需遵循示例格式输入"
-                        rows={5}
-                        value={batchInput}
-                        onChange={(e) => setBatchInput(e.target.value)}
-                        className="placeholder:opacity-40 batch-input-textarea"
-                      />
-                    </div>
-                    <DialogFooter>
-                      <DialogClose asChild>
-                        <Button type="button" variant="outline">取消</Button>
-                      </DialogClose>
-                      <Button type="button" onClick={handleAddHosts} disabled={isAddingHost}>
-                        {isAddingHost ? '添加中...' : '确认添加'}
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+                <div className="flex items-center gap-2">
+                  <Dialog open={isBatchAddOpen} onOpenChange={setIsBatchAddOpen}>
+                    <DialogTrigger asChild>
+                      <Button><PlusCircledIcon className="mr-2 h-4 w-4" /> 批量添加主机</Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[600px] dialog-content-scroll-hide">
+                      <DialogHeader>
+                        <DialogTitle>批量添加主机</DialogTitle>
+                        <DialogDescription>
+                          每行输入一台主机信息，格式：
+                          {useKeyAuth 
+                            ? "备注 地址 用户名 端口" 
+                            : "备注 地址 用户名 端口 SSH密码"}
+                          。例如：<br />
+                          <code>
+                            {useKeyAuth 
+                              ? "web-server 192.168.1.1 root 22" 
+                              : "db-server 192.168.1.2 admin 22 yourpassword"}
+                          </code>
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="grid gap-4 py-4">
+                        <Textarea
+                          placeholder="需遵循示例格式输入"
+                          rows={5} // Reduced rows
+                          value={batchInput}
+                          onChange={(e) => setBatchInput(e.target.value)}
+                          className="placeholder:opacity-40 batch-input-textarea"
+                        />
+                      </div>
+                      <DialogFooter>
+                        <DialogClose asChild>
+                          <Button type="button" variant="outline">取消</Button>
+                        </DialogClose>
+                        <Button type="button" onClick={handleAddHosts} disabled={isAddingHost}>
+                          {isAddingHost ? '添加中...' : '确认添加'}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                  <div className="flex items-center space-x-2">
+                    <Switch id="key-auth-switch" checked={useKeyAuth} onCheckedChange={setUseKeyAuth} />
+                    <Label htmlFor="key-auth-switch">密钥认证</Label>
+                  </div>
+                </div>
                 <div className="flex gap-2">
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -788,4 +814,5 @@ function MainPage() {
 }
 
 export default MainPage;
+
 
