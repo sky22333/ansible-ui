@@ -27,7 +27,7 @@
 ## Docker快速部署
 ```
 docker run -d \
-  --name ansible \
+  --name ansible-ui \
   -p 5000:5000 \
   -e ANSIBLE_HOST_KEY_CHECKING=False \
   -e ADMIN_USERNAME=admin123 \
