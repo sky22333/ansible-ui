@@ -45,6 +45,31 @@ docker run -d \
 - **会话限制**：加密密钥仅在登录会话中有效，如果服务重启，需要重新登录才能访问加密数据
 
 
+
+
+### 使用密钥认证的方式连接主机
+
+默认会读取容器内的`/root/.ssh/id_rsa`
+
+可以直接宿主机生成密钥对，然后映射进去，也可以进入容器内操作
+
+#### 生成 SSH 密钥对
+```
+ssh-keygen -t rsa -b 4096
+```
+> 一路回车即可，默认生成在`/root/.ssh/id_rsa`和`id_rsa.pub`
+
+#### 将公钥复制到目标主机
+```
+ssh-copy-id -i /root/.ssh/id_rsa.pub root@192.168.2.1
+```
+如果你的目标主机ssh端口不是默认的22，则需要指定端口参数`-o Port=2222`
+
+这条命令会自动把`id_rsa.pub`的内容追加到目标主机的`/root/.ssh/authorized_keys`中
+
+多个主机可以使用脚本for循环批量执行
+
+
 ## 预览
 
 ![1](./.github/workflows/1.jpg)
