@@ -25,8 +25,9 @@ class Database:
                     address TEXT NOT NULL,
                     username TEXT NOT NULL,
                     port INTEGER NOT NULL,
-                    password TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    password TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    auth_method TEXT NOT NULL DEFAULT 'password'
                 )
             """)
             
@@ -82,38 +83,49 @@ class Database:
     def add_host(self, host_data):
         """添加单个主机"""
         with self.get_connection() as conn:
-            # 加密密码后存储
-            encrypted_password = self.crypto.encrypt(host_data['password'])
+            encrypted_password = None
+            auth_method = host_data.get('auth_method', 'password')
+            
+            if auth_method == 'password' and host_data.get('password'):
+                encrypted_password = self.crypto.encrypt(host_data['password'])
+
             cursor = conn.execute("""
-                INSERT INTO hosts (comment, address, username, port, password)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO hosts (comment, address, username, port, password, auth_method)
+                VALUES (?, ?, ?, ?, ?, ?)
             """, (
                 host_data['comment'],
                 host_data['address'],
                 host_data['username'],
                 host_data['port'],
-                encrypted_password
+                encrypted_password,
+                auth_method
             ))
             return cursor.lastrowid
 
     def add_hosts_batch(self, hosts_data):
         """批量添加主机"""
         with self.get_connection() as conn:
-            # 加密每个主机的密码
-            encrypted_hosts = []
+            processed_hosts = []
             for host in hosts_data:
-                encrypted_hosts.append((
+                encrypted_password = None
+                auth_method = host.get('auth_method', 'password')
+                
+                if auth_method == 'password' and host.get('password'):
+                    encrypted_password = self.crypto.encrypt(host['password'])
+                
+                processed_hosts.append((
                     host['comment'],
                     host['address'],
                     host['username'],
                     host['port'],
-                    self.crypto.encrypt(host['password'])
+                    encrypted_password,
+                    auth_method
                 ))
                 
             cursor = conn.executemany("""
-                INSERT INTO hosts (comment, address, username, port, password)
-                VALUES (?, ?, ?, ?, ?)
-            """, encrypted_hosts)
+                INSERT INTO hosts (comment, address, username, port, password, auth_method)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, processed_hosts)
             return cursor.rowcount
 
     def get_hosts(self):
@@ -122,12 +134,12 @@ class Database:
             cursor = conn.execute("SELECT * FROM hosts ORDER BY created_at DESC")
             hosts = [dict(row) for row in cursor.fetchall()]
             
-            # 处理返回的主机数据，解密密码
             for host in hosts:
-                # 保留一个加密版本的密码，供前端识别是否需要重新输入
                 host['encrypted_password'] = host['password']
-                # 解密密码供后端使用
-                host['password'] = self.crypto.decrypt(host['password'])
+                if host['auth_method'] == 'password' and host['password']:
+                    host['password'] = self.crypto.decrypt(host['password'])
+                else:
+                    host['password'] = None
             return hosts
 
     def get_host(self, host_id):
@@ -137,50 +149,41 @@ class Database:
             row = cursor.fetchone()
             if row:
                 host = dict(row)
-                # 保留一个加密版本的密码，供前端识别是否需要重新输入
                 host['encrypted_password'] = host['password']
-                # 解密密码供后端使用
-                host['password'] = self.crypto.decrypt(host['password'])
+                if host['auth_method'] == 'password' and host['password']:
+                    host['password'] = self.crypto.decrypt(host['password'])
+                else:
+                    host['password'] = None
                 return host
             return None
 
     def update_host(self, host_id, host_data):
         """更新主机信息"""
         with self.get_connection() as conn:
-            if host_data.get('password'):
-                # 确保更新时加密新密码
+            auth_method = host_data.get('auth_method', 'password')
+            encrypted_password = None
+
+            if auth_method == 'password' and host_data.get('password'):
                 encrypted_password = self.crypto.encrypt(host_data['password'])
-                conn.execute("""
-                    UPDATE hosts 
-                    SET comment = ?, address = ?, username = ?, port = ?, password = ?
-                    WHERE id = ?
-                """, (
-                    host_data['comment'],
-                    host_data['address'],
-                    host_data['username'],
-                    host_data['port'],
-                    encrypted_password,
-                    host_id
-                ))
-            else:
-                conn.execute("""
-                    UPDATE hosts 
-                    SET comment = ?, address = ?, username = ?, port = ?
-                    WHERE id = ?
-                """, (
-                    host_data['comment'],
-                    host_data['address'],
-                    host_data['username'],
-                    host_data['port'],
-                    host_id
-                ))
+            
+            conn.execute("""
+                UPDATE hosts 
+                SET comment = ?, address = ?, username = ?, port = ?, password = ?, auth_method = ?
+                WHERE id = ?
+            """, (
+                host_data['comment'],
+                host_data['address'],
+                host_data['username'],
+                host_data['port'],
+                encrypted_password,
+                auth_method,
+                host_id
+            ))
 
     def delete_host(self, host_id):
         """删除主机"""
         with self.get_connection() as conn:
-            # 首先删除与主机相关的命令日志
             conn.execute("DELETE FROM command_logs WHERE host_id = ?", (host_id,))
-            # 然后删除主机记录
             conn.execute("DELETE FROM hosts WHERE id = ?", (host_id,))
 
     def log_command(self, host_id, command, output, status):
@@ -205,11 +208,6 @@ class Database:
 
     def add_access_log(self, ip_address, path, status, status_code):
         """添加访问日志"""
-        # 注释掉内网IP过滤，确保记录所有来源IP，包括通过代理转发的
-        # if (ip_address.startswith(('10.', '172.', '192.168.')) or 
-        #     ip_address in ['127.0.0.1', 'localhost']):
-        #     return
-        
         with self.get_connection() as conn:
             conn.execute("""
                 INSERT INTO access_logs (ip_address, path, status, status_code)

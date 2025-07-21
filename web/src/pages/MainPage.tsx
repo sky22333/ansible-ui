@@ -176,7 +176,7 @@ function MainPage() {
     setIsAddingHost(true);
     try {
         // 对每个主机数据进行处理
-        const processedHostsData = hostsData.map(host => prepareHostData(host));
+        const processedHostsData = hostsData.map(host => prepareHostData(host, undefined, useKeyAuth));
         const response = await api.post('/api/hosts/batch', processedHostsData);
         toast.success("成功", { description: response.data.message || `成功添加 ${response.data.count} 台主机` });
         setBatchInput('');
@@ -201,7 +201,7 @@ function MainPage() {
     setIsEditingHost(true);
     try {
       // 处理主机数据，特别是密码字段
-      const dataToSend = prepareHostData(editedHost, editingHost);
+      const dataToSend = prepareHostData(editedHost, editingHost, editedHost.auth_method === 'key');
       
       await api.put(`/api/hosts/${editingHost.id}`, dataToSend);
       toast.success("成功", { description: "主机信息已更新" });

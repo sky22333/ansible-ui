@@ -48,21 +48,20 @@ class AnsibleManager:
             verbosity=0
         )
 
-    def generate_inventory(self, hosts, use_key=False):
+    def generate_inventory(self, hosts):
         """生成临时 inventory 文件"""
         inventory_content = ["[managed_hosts]"]
         for host in hosts:
             line = f"{host['address']} ansible_user={host['username']} ansible_port={host['port']} "
             
-            if use_key:
+            if host['auth_method'] == 'key':
                 # 使用私钥认证
                 line += "ansible_ssh_private_key_file=/root/.ssh/id_rsa "
-            else:
+            elif host['auth_method'] == 'password':
                 # 使用密码认证
                 password = host.get('password')
-                if isinstance(password, str) and password.startswith("ENC:"):
-                    password = self.crypto.decrypt(password)
-                line += f"ansible_ssh_pass={password} "
+                if password:
+                    line += f"ansible_ssh_pass={password} "
 
             line += "ansible_ssh_common_args='-o StrictHostKeyChecking=no'"
             inventory_content.append(line)
@@ -280,12 +279,19 @@ class AnsibleManager:
             return results['success'][host['address']]
         return None
 
-    def run_playbook(self, play):
+    def run_playbook(self, play, target_hosts=None):
         """运行 playbook"""
         try:
             # 初始化必要的对象
             loader = DataLoader()
-            inventory = InventoryManager(loader=loader, sources=self.generate_inventory(self.db.get_hosts()))
+            
+            # 根据是否指定target_hosts来生成inventory
+            if target_hosts:
+                inventory_path = self.generate_inventory(target_hosts)
+            else:
+                inventory_path = self.generate_inventory(self.db.get_hosts())
+
+            inventory = InventoryManager(loader=loader, sources=inventory_path)
             variable_manager = VariableManager(loader=loader, inventory=inventory)
             
             # 创建回调插件对象
@@ -323,19 +329,19 @@ class AnsibleManager:
             hosts = [hosts]
         
         # 获取选中主机的地址列表
-        selected_hosts = []
+        selected_hosts_data = []
         all_hosts = self.db.get_hosts()
         for host in all_hosts:
             # 兼容字符串ID和数字ID，转为字符串进行比较
             host_id_str = str(host['id'])
             if host_id_str in [str(h) for h in hosts]:
-                selected_hosts.append(host['address'])
+                selected_hosts_data.append(host)
         
-        if not selected_hosts:
+        if not selected_hosts_data:
             raise Exception("没有找到选中的主机")
         
         # 使用选中主机的地址列表创建主机组
-        hosts_str = ','.join(selected_hosts)
+        hosts_str = ','.join([h['address'] for h in selected_hosts_data])
         
         play = [{
             'name': 'Copy file to selected hosts',
@@ -360,13 +366,14 @@ class AnsibleManager:
         
         try:
             # 执行并获取结果
-            result = self.run_playbook(play)
+            result = self.run_playbook(play, target_hosts=selected_hosts_data)
             return result
         except Exception as e:
             raise Exception(f"复制文件失败: {str(e)}")
 
     def copy_file_to_all(self, src, dest):
         """复制文件到所有主机，返回详细的成功/失败结果"""
+        all_hosts = self.db.get_hosts()
         play = [{
             'name': 'Copy file to all hosts',
             'hosts': 'all',
@@ -390,12 +397,12 @@ class AnsibleManager:
         
         try:
             # 执行并获取结果
-            result = self.run_playbook(play)
+            result = self.run_playbook(play, target_hosts=all_hosts)
             return result
         except Exception as e:
             raise Exception(f"复制文件失败: {str(e)}")
 
-    def execute_custom_playbook(self, playbook_content, use_key=False, target_hosts=None):
+    def execute_custom_playbook(self, playbook_content, target_hosts=None):
         """执行自定义Playbook"""
         # 创建临时playbook文件
         fd, playbook_path = tempfile.mkstemp(prefix='ansible_playbook_', suffix='.yml')
@@ -409,7 +416,7 @@ class AnsibleManager:
             # 如果提供了特定主机，则生成临时inventory
             inventory_option = []
             if target_hosts:
-                inventory_path = self.generate_inventory(target_hosts, use_key)
+                inventory_path = self.generate_inventory(target_hosts)
                 inventory_option = ['-i', inventory_path]
             
             # 构建ansible-playbook命令

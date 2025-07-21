@@ -264,8 +264,12 @@ def get_hosts():
     hosts = db.get_hosts()
     for host in hosts:
         # 不返回明文密码到前端，但保留加密形式用于识别
-        host['is_password_encrypted'] = crypto.is_encrypted(host['encrypted_password'])
-        host['password'] = '********'
+        # 根据认证方式调整 is_password_encrypted 的含义
+        if host['auth_method'] == 'password':
+            host['is_password_encrypted'] = crypto.is_encrypted(host['encrypted_password'])
+        else:
+            host['is_password_encrypted'] = False # 密钥认证，没有加密密码
+        host['password'] = '********' # 始终不返回明文密码
         # 删除不需要返回的字段
         if 'encrypted_password' in host:
             del host['encrypted_password']
@@ -278,9 +282,12 @@ def get_host(host_id):
     """获取单个主机信息"""
     host = db.get_host(host_id)
     if host:
-        # 不返回明文密码到前端，但保留加密形式用于识别
-        host['is_password_encrypted'] = crypto.is_encrypted(host['encrypted_password'])
-        host['password'] = '********'
+        # 根据认证方式调整 is_password_encrypted 的含义
+        if host['auth_method'] == 'password':
+            host['is_password_encrypted'] = crypto.is_encrypted(host['encrypted_password'])
+        else:
+            host['is_password_encrypted'] = False # 密钥认证，没有加密密码
+        host['password'] = '********' # 始终不返回明文密码
         # 删除不需要返回的字段
         if 'encrypted_password' in host:
             del host['encrypted_password']
@@ -293,7 +300,11 @@ def get_host(host_id):
 def add_host():
     """添加单个主机"""
     host_data = request.json
-    required_fields = ['comment', 'address', 'username', 'port', 'password']
+    auth_method = host_data.get('auth_method', 'password') # 默认为密码认证
+
+    required_fields = ['comment', 'address', 'username', 'port']
+    if auth_method == 'password':
+        required_fields.append('password')
     
     if not all(field in host_data for field in required_fields):
         return jsonify({'error': 'Missing required fields'}), 400
@@ -313,8 +324,12 @@ def add_hosts_batch():
     if not isinstance(hosts_data, list):
         return jsonify({'error': 'Invalid data format'}), 400
 
-    required_fields = ['comment', 'address', 'username', 'port', 'password']
     for host in hosts_data:
+        auth_method = host.get('auth_method', 'password')
+        required_fields = ['comment', 'address', 'username', 'port']
+        if auth_method == 'password':
+            required_fields.append('password')
+        
         if not all(field in host for field in required_fields):
             return jsonify({'error': f'Missing required fields in host data: {host}'}), 400
 
@@ -330,7 +345,18 @@ def add_hosts_batch():
 def update_host(host_id):
     """更新主机信息"""
     host_data = request.json
+    auth_method = host_data.get('auth_method', 'password') # 默认为密码认证
+
     required_fields = ['comment', 'address', 'username', 'port']
+    if auth_method == 'password' and 'password' in host_data and host_data['password'] != '':
+        # 如果是密码认证且提供了新密码，则密码是必需的
+        pass # 密码会在db.update_host中处理
+    elif auth_method == 'password' and ('password' not in host_data or host_data['password'] == ''):
+        # 如果是密码认证但未提供新密码，则不更新密码字段，保持原有密码
+        pass
+    elif auth_method == 'key':
+        # 如果是密钥认证，密码字段不强制要求
+        pass
     
     if not all(field in host_data for field in required_fields):
         return jsonify({'error': 'Missing required fields'}), 400
@@ -480,17 +506,18 @@ def terminal_ws(ws, host_id):
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         
-        # 确保使用解密后的密码
-        password = host['password']
-        
         app.logger.info(f"正在连接SSH")
-        ssh.connect(
-            host['address'],
-            port=host['port'],
-            username=host['username'],
-            password=password,
-            timeout=10
-        )
+        connect_args = {
+            'hostname': host['address'],
+            'port': host['port'],
+            'username': host['username'],
+            'timeout': 10
+        }
+        if host['auth_method'] == 'password':
+            connect_args['password'] = host['password']
+        # else: paramiko will try to use SSH agent or default keys (~/.ssh/id_rsa)
+        
+        ssh.connect(**connect_args)
         
         # 默认终端大小
         term_width = 100
@@ -572,12 +599,14 @@ def sftp_list(host_id):
     try:
         with paramiko.SSHClient() as ssh:
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            ssh.connect(
-                host['address'],
-                port=host['port'],
-                username=host['username'],
-                password=host['password']
-            )
+            connect_args = {
+                'hostname': host['address'],
+                'port': host['port'],
+                'username': host['username']
+            }
+            if host['auth_method'] == 'password':
+                connect_args['password'] = host['password']
+            ssh.connect(**connect_args)
             
             with ssh.open_sftp() as sftp:
                 file_list = []
@@ -610,12 +639,14 @@ def sftp_mkdir(host_id):
 
         with paramiko.SSHClient() as ssh:
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            ssh.connect(
-                host['address'],
-                port=host['port'],
-                username=host['username'],
-                password=host['password']
-            )
+            connect_args = {
+                'hostname': host['address'],
+                'port': host['port'],
+                'username': host['username']
+            }
+            if host['auth_method'] == 'password':
+                connect_args['password'] = host['password']
+            ssh.connect(**connect_args)
             
             with ssh.open_sftp() as sftp:
                 try:
@@ -647,12 +678,14 @@ def sftp_upload(host_id):
         
         with paramiko.SSHClient() as ssh:
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            ssh.connect(
-                host['address'],
-                port=host['port'],
-                username=host['username'],
-                password=host['password']
-            )
+            connect_args = {
+                'hostname': host['address'],
+                'port': host['port'],
+                'username': host['username']
+            }
+            if host['auth_method'] == 'password':
+                connect_args['password'] = host['password']
+            ssh.connect(**connect_args)
             
             with ssh.open_sftp() as sftp:
                 for file in files:
@@ -693,12 +726,14 @@ def sftp_rename(host_id):
 
         with paramiko.SSHClient() as ssh:
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            ssh.connect(
-                host['address'],
-                port=host['port'],
-                username=host['username'],
-                password=host['password']
-            )
+            connect_args = {
+                'hostname': host['address'],
+                'port': host['port'],
+                'username': host['username']
+            }
+            if host['auth_method'] == 'password':
+                connect_args['password'] = host['password']
+            ssh.connect(**connect_args)
             
             with ssh.open_sftp() as sftp:
                 try:
@@ -730,12 +765,14 @@ def sftp_touch(host_id):
 
         with paramiko.SSHClient() as ssh:
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            ssh.connect(
-                host['address'],
-                port=host['port'],
-                username=host['username'],
-                password=host['password']
-            )
+            connect_args = {
+                'hostname': host['address'],
+                'port': host['port'],
+                'username': host['username']
+            }
+            if host['auth_method'] == 'password':
+                connect_args['password'] = host['password']
+            ssh.connect(**connect_args)
             
             with ssh.open_sftp() as sftp:
                 try:
@@ -764,12 +801,14 @@ def sftp_read(host_id):
     try:
         with paramiko.SSHClient() as ssh:
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            ssh.connect(
-                host['address'],
-                port=host['port'],
-                username=host['username'],
-                password=host['password']
-            )
+            connect_args = {
+                'hostname': host['address'],
+                'port': host['port'],
+                'username': host['username']
+            }
+            if host['auth_method'] == 'password':
+                connect_args['password'] = host['password']
+            ssh.connect(**connect_args)
             
             with ssh.open_sftp() as sftp:
                 with sftp.file(path, 'r') as f:
@@ -798,12 +837,14 @@ def sftp_write(host_id):
 
         with paramiko.SSHClient() as ssh:
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            ssh.connect(
-                host['address'],
-                port=host['port'],
-                username=host['username'],
-                password=host['password']
-            )
+            connect_args = {
+                'hostname': host['address'],
+                'port': host['port'],
+                'username': host['username']
+            }
+            if host['auth_method'] == 'password':
+                connect_args['password'] = host['password']
+            ssh.connect(**connect_args)
             
             with ssh.open_sftp() as sftp:
                 with sftp.file(path, 'w') as f:
@@ -832,12 +873,14 @@ def sftp_delete(host_id):
 
         with paramiko.SSHClient() as ssh:
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            ssh.connect(
-                host['address'],
-                port=host['port'],
-                username=host['username'],
-                password=host['password']
-            )
+            connect_args = {
+                'hostname': host['address'],
+                'port': host['port'],
+                'username': host['username']
+            }
+            if host['auth_method'] == 'password':
+                connect_args['password'] = host['password']
+            ssh.connect(**connect_args)
             
             with ssh.open_sftp() as sftp:
                 if is_directory:
@@ -869,12 +912,14 @@ def sftp_download(host_id):
         filename = os.path.basename(path)
         with paramiko.SSHClient() as ssh:
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            ssh.connect(
-                host['address'],
-                port=host['port'],
-                username=host['username'],
-                password=host['password']
-            )
+            connect_args = {
+                'hostname': host['address'],
+                'port': host['port'],
+                'username': host['username']
+            }
+            if host['auth_method'] == 'password':
+                connect_args['password'] = host['password']
+            ssh.connect(**connect_args)
             
             with ssh.open_sftp() as sftp:
                 # 检查文件状态
