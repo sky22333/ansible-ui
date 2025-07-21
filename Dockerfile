@@ -7,7 +7,7 @@ RUN npm install -g pnpm
 COPY ./web /app
 RUN pnpm install && pnpm run build
 
-FROM python:3.9-alpine
+FROM python:3.11-alpine
 
 WORKDIR /app
 

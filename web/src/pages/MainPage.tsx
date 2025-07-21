@@ -511,13 +511,13 @@ function MainPage() {
                         <DialogDescription>
                           每行输入一台主机信息，格式：
                           {useKeyAuth 
-                            ? "备注 地址 用户名 端口" 
-                            : "备注 地址 用户名 端口 SSH密码"}
+                            ? "备注 地址 用户 端口" 
+                            : "备注 地址 用户 端口 SSH密码"}
                           。例如：<br />
                           <code>
                             {useKeyAuth 
-                              ? "web-server 192.168.1.1 root 22" 
-                              : "db-server 192.168.1.2 admin 22 yourpassword"}
+                              ? "us 192.168.1.1 root 22" 
+                              : "us 192.168.1.2 root 22 yourpassword"}
                           </code>
                         </DialogDescription>
                       </DialogHeader>
@@ -542,7 +542,7 @@ function MainPage() {
                   </Dialog>
                   <div className="flex items-center space-x-2">
                     <Switch id="key-auth-switch" checked={useKeyAuth} onCheckedChange={setUseKeyAuth} />
-                    <Label htmlFor="key-auth-switch">密钥认证</Label>
+                    <Label htmlFor="key-auth-switch">使用密钥认证</Label>
                   </div>
                 </div>
                 <div className="flex gap-2">
