@@ -800,7 +800,7 @@ function MainPage() {
         {/* GitHub Link */}
         <div className="text-center mt-6 mb-2">
           <a 
-            href="https://github.com/sky22333/ansible" 
+            href="https://github.com/sky22333/ansible-ui" 
             target="_blank" 
             rel="noopener noreferrer" 
             className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
