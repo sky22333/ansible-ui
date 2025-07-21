@@ -1141,6 +1141,7 @@ def execute_playbook():
     data = request.json
     playbook_content = data.get('playbook')
     host_ids = data.get('host_ids', [])
+    use_key = data.get('use_key', False)  # 获取 use_key 参数
     
     # 验证输入
     if not playbook_content:
@@ -1155,7 +1156,7 @@ def execute_playbook():
     
     # 执行Playbook
     try:
-        result = ansible.execute_custom_playbook(playbook_content, target_hosts)
+        result = ansible.execute_custom_playbook(playbook_content, use_key, target_hosts)
         
         # 记录执行日志
         # 如果有指定主机，则为每个主机记录一条日志

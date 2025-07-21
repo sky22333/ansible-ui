@@ -48,18 +48,22 @@ class AnsibleManager:
             verbosity=0
         )
 
-    def generate_inventory(self, hosts):
+    def generate_inventory(self, hosts, use_key=False):
         """生成临时 inventory 文件"""
         inventory_content = ["[managed_hosts]"]
         for host in hosts:
-            # 确保使用解密后的密码
-            password = host.get('password')
-            # 如果密码是加密的，解密它
-            if isinstance(password, str) and password.startswith("ENC:"):
-                password = self.crypto.decrypt(password)
-                
-            line = f"{host['address']} ansible_user={host['username']} "
-            line += f"ansible_port={host['port']} ansible_ssh_pass={password} "
+            line = f"{host['address']} ansible_user={host['username']} ansible_port={host['port']} "
+            
+            if use_key:
+                # 使用私钥认证
+                line += "ansible_ssh_private_key_file=/root/.ssh/id_rsa "
+            else:
+                # 使用密码认证
+                password = host.get('password')
+                if isinstance(password, str) and password.startswith("ENC:"):
+                    password = self.crypto.decrypt(password)
+                line += f"ansible_ssh_pass={password} "
+
             line += "ansible_ssh_common_args='-o StrictHostKeyChecking=no'"
             inventory_content.append(line)
 
@@ -391,7 +395,7 @@ class AnsibleManager:
         except Exception as e:
             raise Exception(f"复制文件失败: {str(e)}")
 
-    def execute_custom_playbook(self, playbook_content, target_hosts=None):
+    def execute_custom_playbook(self, playbook_content, use_key=False, target_hosts=None):
         """执行自定义Playbook"""
         # 创建临时playbook文件
         fd, playbook_path = tempfile.mkstemp(prefix='ansible_playbook_', suffix='.yml')
@@ -405,7 +409,7 @@ class AnsibleManager:
             # 如果提供了特定主机，则生成临时inventory
             inventory_option = []
             if target_hosts:
-                inventory_path = self.generate_inventory(target_hosts)
+                inventory_path = self.generate_inventory(target_hosts, use_key)
                 inventory_option = ['-i', inventory_path]
             
             # 构建ansible-playbook命令

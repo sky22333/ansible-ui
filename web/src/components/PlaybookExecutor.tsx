@@ -6,6 +6,7 @@ import api from '@/services/api';
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { CheckCircleIcon, XCircleIcon } from 'lucide-react';
+import { Switch } from "@/components/ui/switch";
 
 interface PlaybookExecutorProps {
   targetHostIds: number[] | 'all';
@@ -25,7 +26,7 @@ interface PlaybookResult {
   };
 }
 
-const defaultPlaybook = `---
+const defaultPlaybook = `--- 
 # Ansible Playbook 示例
 - name: 示例任务
   hosts: all
@@ -44,6 +45,7 @@ function PlaybookExecutor({ targetHostIds, onExecutionComplete, onClose }: Playb
   const [isExecuting, setIsExecuting] = useState(false);
   const [executionProgress, setExecutionProgress] = useState(0);
   const [executionResult, setExecutionResult] = useState<PlaybookResult | null>(null);
+  const [useKeyAuth, setUseKeyAuth] = useState(false);
 
   const handleExecution = async () => {
     if (!playbook.trim()) {
@@ -59,7 +61,8 @@ function PlaybookExecutor({ targetHostIds, onExecutionComplete, onClose }: Playb
       // 准备请求数据
       const requestData = {
         playbook: playbook.trim(),
-        host_ids: targetHostIds === 'all' ? [] : targetHostIds
+        host_ids: targetHostIds === 'all' ? [] : targetHostIds,
+        use_key: useKeyAuth
       };
 
       // 发送请求执行Playbook
@@ -123,6 +126,11 @@ function PlaybookExecutor({ targetHostIds, onExecutionComplete, onClose }: Playb
           disabled={isExecuting}
         />
         <p className="text-xs text-muted-foreground">输入标准的Ansible Playbook格式，将对选中的主机执行。</p>
+      </div>
+
+      <div className="flex items-center space-x-2 my-4">
+        <Switch id="key-auth-switch" checked={useKeyAuth} onCheckedChange={setUseKeyAuth} disabled={isExecuting} />
+        <Label htmlFor="key-auth-switch">使用统一密钥认证</Label>
       </div>
 
       {isExecuting && (
@@ -210,4 +218,5 @@ function PlaybookExecutor({ targetHostIds, onExecutionComplete, onClose }: Playb
   );
 }
 
-export default PlaybookExecutor; 
+export default PlaybookExecutor;
+ 
