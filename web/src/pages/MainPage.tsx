@@ -563,7 +563,7 @@ function MainPage() {
                       </div>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>{useKeyAuth ? '新添加的主机将使用SSH密钥认证' : '新添加的主机将使用密码认证'}</p>
+                      <p>{useKeyAuth ? '新添加的主机将使用 /root/.ssh/id_rsa 路径的密钥认证' : '新添加的主机将使用密码认证'}</p>
                     </TooltipContent>
                   </Tooltip>
                 </div>
