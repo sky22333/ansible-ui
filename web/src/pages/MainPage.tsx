@@ -63,8 +63,11 @@ function MainPage() {
   const [isAuthChecking, setIsAuthChecking] = useState(true); // 新增：认证检查状态
   const [isPlaybookDialogOpen, setIsPlaybookDialogOpen] = useState(false);
   const [playbookTarget, setPlaybookTarget] = useState<'selected' | 'all' | null>(null);
-  const [useKeyAuth, setUseKeyAuth] = useState(false);
-  
+  const [useKeyAuth, setUseKeyAuth] = useState(() => {
+    const saved = localStorage.getItem('useKeyAuth');
+    return saved ? JSON.parse(saved) : false;
+  });
+
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
 
@@ -73,7 +76,7 @@ function MainPage() {
     const checkAuth = () => {
       try {
         const isLocalAuth = authStorage.getAuth();
-        
+
         // 如果既没有React context认证也没有localStorage认证，则跳转到登录页
         if (!isAuthenticated && !isLocalAuth) {
           navigate('/login');
@@ -87,12 +90,12 @@ function MainPage() {
 
     // 立即检查认证状态
     const isAuthed = checkAuth();
-    
+
     // 只有通过了认证检查，才执行后续的数据加载
     if (isAuthed) {
       fetchHosts();
     }
-    
+
     // 完成认证检查
     setIsAuthChecking(false);
   }, [isAuthenticated, navigate]);
@@ -100,6 +103,11 @@ function MainPage() {
   useEffect(() => {
     fetchHosts();
   }, []);
+
+  // 持久化密钥认证开关状态
+  useEffect(() => {
+    localStorage.setItem('useKeyAuth', JSON.stringify(useKeyAuth));
+  }, [useKeyAuth]);
 
   const fetchHosts = async () => {
     setIsLoadingHosts(true);
@@ -136,8 +144,8 @@ function MainPage() {
 
   const handleAddHosts = async () => {
     if (!batchInput.trim()) {
-        toast.error("错误", { description: "请输入主机信息" });
-        return;
+      toast.error("错误", { description: "请输入主机信息" });
+      return;
     }
     const lines = batchInput.trim().split('\n');
     const hostsData: Omit<Host, 'id'>[] = [];
@@ -146,55 +154,60 @@ function MainPage() {
     const formatString = useKeyAuth ? "'备注 地址 用户名 端口'" : "'备注 地址 用户名 端口 密码'";
 
     lines.forEach((line, index) => {
-        if (line.trim() === '') return;
-        const parts = line.trim().split(/\s+/);
-        if (parts.length !== expectedParts) {
-            errors.push(`第${index + 1}行：格式错误，应为 ${formatString}`);
+      if (line.trim() === '') return;
+      const parts = line.trim().split(/\s+/);
+      if (parts.length !== expectedParts) {
+        errors.push(`第${index + 1}行：格式错误，应为 ${formatString}`);
+      } else {
+        const [comment, address, username, portStr, password] = parts;
+        const port = parseInt(portStr, 10);
+        if (isNaN(port)) {
+          errors.push(`第${index + 1}行：端口号 '${portStr}' 无效`);
         } else {
-            const [comment, address, username, portStr, password] = parts;
-            const port = parseInt(portStr, 10);
-            if (isNaN(port)) {
-                errors.push(`第${index + 1}行：端口号 '${portStr}' 无效`);
-            } else {
-                hostsData.push({ 
-                    comment, 
-                    address, 
-                    username, 
-                    port, 
-                    password: useKeyAuth ? '' : password 
-                });
-            }
+          hostsData.push({
+            comment,
+            address,
+            username,
+            port,
+            password: useKeyAuth ? '' : password
+          });
         }
+      }
     });
     if (errors.length > 0) {
-        errors.forEach(err => toast.error("输入错误", { description: err }));
-        return;
+      errors.forEach(err => toast.error("输入错误", { description: err }));
+      return;
     }
     if (hostsData.length === 0) {
-        toast.error("错误", { description: "未找到有效的主机信息" });
-        return;
+      toast.error("错误", { description: "未找到有效的主机信息" });
+      return;
     }
     setIsAddingHost(true);
     try {
-        // 对每个主机数据进行处理
-        const processedHostsData = hostsData.map(host => prepareHostData(host, undefined, useKeyAuth));
-        const response = await api.post('/api/hosts/batch', processedHostsData);
-        toast.success("成功", { description: response.data.message || `成功添加 ${response.data.count} 台主机` });
-        setBatchInput('');
-        fetchHosts();
-        setIsBatchAddOpen(false); // Close dialog on success
+      // 对每个主机数据进行处理
+      const processedHostsData = hostsData.map(host => prepareHostData(host, undefined, useKeyAuth));
+      const response = await api.post('/api/hosts/batch', processedHostsData);
+      toast.success("成功", { description: response.data.message || `成功添加 ${response.data.count} 台主机` });
+      setBatchInput('');
+      fetchHosts();
+      setIsBatchAddOpen(false); // Close dialog on success
     } catch (error) {
-        console.error('Failed to add hosts:', error);
-        toast.error("添加主机失败", {
-            description: error instanceof Error ? error.message : (error as any).response?.data?.error || "发生未知错误",
-        });
+      console.error('Failed to add hosts:', error);
+      toast.error("添加主机失败", {
+        description: error instanceof Error ? error.message : (error as any).response?.data?.error || "发生未知错误",
+      });
     } finally {
-        setIsAddingHost(false);
+      setIsAddingHost(false);
     }
   };
 
   const handleEditHost = (host: Host) => {
-    setEditingHost(host);
+    // 确保编辑时有默认的认证方式
+    const hostWithDefaults = {
+      ...host,
+      auth_method: host.auth_method || 'password'
+    };
+    setEditingHost(hostWithDefaults);
   };
 
   const handleSaveEdit = async (editedHost: Host) => {
@@ -203,7 +216,7 @@ function MainPage() {
     try {
       // 处理主机数据，特别是密码字段
       const dataToSend = prepareHostData(editedHost, editingHost, editedHost.auth_method === 'key');
-      
+
       await api.put(`/api/hosts/${editingHost.id}`, dataToSend);
       toast.success("成功", { description: "主机信息已更新" });
       setEditingHost(null);
@@ -308,13 +321,13 @@ function MainPage() {
   const openTerminal = (hostId: number) => {
     // 打开新窗口
     const terminalWindow = window.open(`/terminal/${hostId}`, `terminal_${hostId}`, 'width=800,height=600');
-    
+
     // 确保新窗口成功打开
     if (!terminalWindow) {
       toast.error('无法打开终端', { description: '请允许浏览器打开弹出窗口' });
       return;
     }
-    
+
     // 等待新窗口加载完成
     const sendAuthInfo = () => {
       try {
@@ -322,7 +335,7 @@ function MainPage() {
         const token = authStorage.getToken();
         const expiresAt = new Date();
         expiresAt.setHours(expiresAt.getHours() + 5); // 5小时过期时间
-        
+
         // 如果terminalWindow可用且已加载完成，发送认证信息
         if (terminalWindow && terminalWindow.document.readyState === 'complete') {
           localStorage.setItem('isAuthenticated', 'true');
@@ -330,7 +343,7 @@ function MainPage() {
           if (token) {
             localStorage.setItem('token', token);
           }
-          
+
           // 尝试向新窗口发送消息，以便它可以检测认证状态
           terminalWindow.postMessage({
             type: 'AUTH_INFO',
@@ -338,7 +351,7 @@ function MainPage() {
             authExpiresAt: expiresAt.toISOString(),
             token: token
           }, '*');
-          
+
           // 移除敏感日志
         } else {
           // 如果窗口未完成加载，稍后再试
@@ -349,7 +362,7 @@ function MainPage() {
         toast.error('无法连接到终端', { description: '认证信息传递失败' });
       }
     };
-    
+
     // 开始尝试发送认证信息
     setTimeout(sendAuthInfo, 500);
   };
@@ -360,8 +373,8 @@ function MainPage() {
       return;
     }
     if (target === 'all' && hosts.length === 0) {
-        toast.error("错误", { description: "没有主机可供上传" });
-        return;
+      toast.error("错误", { description: "没有主机可供上传" });
+      return;
     }
     setUploadTarget(target);
     setIsUploadDialogOpen(true);
@@ -397,7 +410,7 @@ function MainPage() {
     setPlaybookTarget(target);
     setIsPlaybookDialogOpen(true);
   };
-  
+
   const handlePlaybookComplete = () => {
     console.log("Playbook execution complete");
   };
@@ -510,13 +523,13 @@ function MainPage() {
                         <DialogTitle>批量添加主机</DialogTitle>
                         <DialogDescription>
                           每行输入一台主机信息，格式：
-                          {useKeyAuth 
-                            ? "备注 地址 用户 端口" 
+                          {useKeyAuth
+                            ? "备注 地址 用户 端口"
                             : "备注 地址 用户 端口 SSH密码"}
                           。例如：<br />
                           <code>
-                            {useKeyAuth 
-                              ? "us 192.168.1.1 root 22" 
+                            {useKeyAuth
+                              ? "us 192.168.1.1 root 22"
                               : "us 192.168.1.2 root 22 yourpassword"}
                           </code>
                         </DialogDescription>
@@ -540,16 +553,25 @@ function MainPage() {
                       </DialogFooter>
                     </DialogContent>
                   </Dialog>
-                  <div className="flex items-center space-x-2">
-                    <Switch id="key-auth-switch" checked={useKeyAuth} onCheckedChange={setUseKeyAuth} />
-                    <Label htmlFor="key-auth-switch">使用密钥认证</Label>
-                  </div>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="flex items-center space-x-2">
+                        <Switch id="key-auth-switch" checked={useKeyAuth} onCheckedChange={setUseKeyAuth} />
+                        <Label htmlFor="key-auth-switch" className="cursor-pointer">
+                          {useKeyAuth ? '密钥认证模式' : '密码认证模式'}
+                        </Label>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{useKeyAuth ? '新添加的主机将使用SSH密钥认证' : '新添加的主机将使用密码认证'}</p>
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
                 <div className="flex gap-2">
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button variant="outline" size="sm" 
-                        disabled={selectedHostIds.length === 0} 
+                      <Button variant="outline" size="sm"
+                        disabled={selectedHostIds.length === 0}
                         onClick={() => openPlaybookDialog('selected')}>
                         <PlayIcon className="mr-2 h-4 w-4" /> 执行任务
                       </Button>
@@ -558,8 +580,8 @@ function MainPage() {
                   </Tooltip>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button variant="outline" size="sm" 
-                        disabled={selectedHostIds.length === 0} 
+                      <Button variant="outline" size="sm"
+                        disabled={selectedHostIds.length === 0}
                         onClick={() => openUploadDialog('selected')}>
                         <UploadIcon className="mr-2 h-4 w-4" /> 上传文件
                       </Button>
@@ -568,9 +590,9 @@ function MainPage() {
                   </Tooltip>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                       <Button variant="outline" size="sm" onClick={handlePingAllHosts} disabled={isLoadingHosts || hosts.some(h => h.status === 'checking')}>
-                         <ReloadIcon className={`mr-2 h-4 w-4 ${hosts.some(h => h.status === 'checking') ? 'animate-spin' : ''}`} /> Ping 所有
-                       </Button>
+                      <Button variant="outline" size="sm" onClick={handlePingAllHosts} disabled={isLoadingHosts || hosts.some(h => h.status === 'checking')}>
+                        <ReloadIcon className={`mr-2 h-4 w-4 ${hosts.some(h => h.status === 'checking') ? 'animate-spin' : ''}`} /> Ping 所有
+                      </Button>
                     </TooltipTrigger>
                     <TooltipContent><p>检查所有主机的连通性</p></TooltipContent>
                   </Tooltip>
@@ -670,29 +692,42 @@ function MainPage() {
                                     {/* Form fields remain the same */}
                                     <div className="grid grid-cols-4 items-center gap-4">
                                       <Label htmlFor="edit-comment" className="text-right">备注</Label>
-                                      <Input id="edit-comment" value={editingHost.comment} onChange={(e) => setEditingHost({...editingHost, comment: e.target.value})} className="col-span-3" />
+                                      <Input id="edit-comment" value={editingHost.comment} onChange={(e) => setEditingHost({ ...editingHost, comment: e.target.value })} className="col-span-3" />
                                     </div>
                                     <div className="grid grid-cols-4 items-center gap-4">
                                       <Label htmlFor="edit-address" className="text-right">地址</Label>
-                                      <Input id="edit-address" value={editingHost.address} onChange={(e) => setEditingHost({...editingHost, address: e.target.value})} className="col-span-3" />
+                                      <Input id="edit-address" value={editingHost.address} onChange={(e) => setEditingHost({ ...editingHost, address: e.target.value })} className="col-span-3" />
                                     </div>
                                     <div className="grid grid-cols-4 items-center gap-4">
                                       <Label htmlFor="edit-username" className="text-right">用户名</Label>
-                                      <Input id="edit-username" value={editingHost.username} onChange={(e) => setEditingHost({...editingHost, username: e.target.value})} className="col-span-3" />
+                                      <Input id="edit-username" value={editingHost.username} onChange={(e) => setEditingHost({ ...editingHost, username: e.target.value })} className="col-span-3" />
                                     </div>
                                     <div className="grid grid-cols-4 items-center gap-4">
                                       <Label htmlFor="edit-port" className="text-right">端口</Label>
-                                      <Input id="edit-port" type="number" value={editingHost.port} onChange={(e) => setEditingHost({...editingHost, port: parseInt(e.target.value, 10) || 22})} className="col-span-3" />
+                                      <Input id="edit-port" type="number" value={editingHost.port} onChange={(e) => setEditingHost({ ...editingHost, port: parseInt(e.target.value, 10) || 22 })} className="col-span-3" />
                                     </div>
                                     <div className="grid grid-cols-4 items-center gap-4">
-                                      <Label htmlFor="edit-password" className="text-right">密码</Label>
-                                      <Input id="edit-password" type="password" placeholder="留空则不修改" onChange={(e) => setEditingHost({...editingHost, password: e.target.value})} className="col-span-3" />
+                                      <Label htmlFor="edit-auth-method" className="text-right">认证方式</Label>
+                                      <div className="col-span-3 flex items-center space-x-2">
+                                        <Switch
+                                          id="edit-auth-method"
+                                          checked={editingHost.auth_method === 'key'}
+                                          onCheckedChange={(checked) => setEditingHost({ ...editingHost, auth_method: checked ? 'key' : 'password' })}
+                                        />
+                                        <Label htmlFor="edit-auth-method">{editingHost.auth_method === 'key' ? '密钥认证' : '密码认证'}</Label>
+                                      </div>
                                     </div>
+                                    {editingHost.auth_method === 'password' && (
+                                      <div className="grid grid-cols-4 items-center gap-4">
+                                        <Label htmlFor="edit-password" className="text-right">密码</Label>
+                                        <Input id="edit-password" type="password" placeholder="留空则不修改" onChange={(e) => setEditingHost({ ...editingHost, password: e.target.value })} className="col-span-3" />
+                                      </div>
+                                    )}
                                   </div>
                                 )}
                                 <DialogFooter>
                                   <DialogClose asChild>
-                                     <Button type="button" variant="outline">取消</Button>
+                                    <Button type="button" variant="outline">取消</Button>
                                   </DialogClose>
                                   <Button type="button" onClick={() => editingHost && handleSaveEdit(editingHost)} disabled={isEditingHost}>
                                     {isEditingHost ? '保存中...' : '保存更改'}
@@ -760,23 +795,23 @@ function MainPage() {
 
         {/* File Upload Dialog */}
         <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
-            <DialogContent className="sm:max-w-[525px]">
-                <DialogHeader>
-                <DialogTitle>文件上传</DialogTitle>
-                <DialogDescription>
-                    选择文件并指定远程路径，然后上传到 {uploadTarget === 'all' ? '所有主机' : '选定主机'}。
-                </DialogDescription>
-                </DialogHeader>
-                {uploadTarget && (
-                    <FileUpload
-                        targetHostIds={uploadTarget === 'all' ? 'all' : selectedHostIds}
-                        onUploadComplete={handleUploadComplete}
-                        onClose={() => setIsUploadDialogOpen(false)}
-                    />
-                )}
-            </DialogContent>
+          <DialogContent className="sm:max-w-[525px]">
+            <DialogHeader>
+              <DialogTitle>文件上传</DialogTitle>
+              <DialogDescription>
+                选择文件并指定远程路径，然后上传到 {uploadTarget === 'all' ? '所有主机' : '选定主机'}。
+              </DialogDescription>
+            </DialogHeader>
+            {uploadTarget && (
+              <FileUpload
+                targetHostIds={uploadTarget === 'all' ? 'all' : selectedHostIds}
+                onUploadComplete={handleUploadComplete}
+                onClose={() => setIsUploadDialogOpen(false)}
+              />
+            )}
+          </DialogContent>
         </Dialog>
-        
+
         {/* Playbook Execution Dialog */}
         <Dialog open={isPlaybookDialogOpen} onOpenChange={setIsPlaybookDialogOpen}>
           <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto dialog-content-scroll-hide">
@@ -786,7 +821,7 @@ function MainPage() {
                 在 {playbookTarget === 'all' ? '所有主机' : '选定主机'} 上执行自定义Playbook。
               </DialogDescription>
             </DialogHeader>
-            
+
             {playbookTarget && (
               <PlaybookExecutor
                 targetHostIds={playbookTarget === 'all' ? 'all' : selectedHostIds}
@@ -799,10 +834,10 @@ function MainPage() {
 
         {/* GitHub Link */}
         <div className="text-center mt-6 mb-2">
-          <a 
-            href="https://github.com/sky22333/ansible-ui" 
-            target="_blank" 
-            rel="noopener noreferrer" 
+          <a
+            href="https://github.com/sky22333/ansible-ui"
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
             title="GitHub仓库"
           >
