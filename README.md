@@ -33,6 +33,7 @@ docker run -d \
   -e ADMIN_USERNAME=admin123 \
   -e ADMIN_PASSWORD=admin123 \
   -v ./ansible:/app/db \
+  -v /root/.ssh:/root/.ssh \
   ghcr.io/sky22333/ansible-ui
 ```
 建议反代并开启HTTPS加强安全性。务必设置一个强密码
