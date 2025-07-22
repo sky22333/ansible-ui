@@ -1,15 +1,11 @@
-name: dev分支镜像构建
+name: ghcr镜像构建
 on:
   workflow_dispatch:
     inputs:
       version:
         description: '镜像标签'
         required: true
-        default: 'latest'  # 默认设置为 dev 标签
-      branch:
-        description: '选择分支'
-        required: true
-        default: 'dev'  # 默认构建 dev 分支
+        default: 'latest'
 
 jobs:
   build:
