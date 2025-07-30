@@ -33,7 +33,7 @@ docker run -d \
   -e ADMIN_USERNAME=admin123 \
   -e ADMIN_PASSWORD=admin123 \
   -v ./ansible:/app/db \
-  -v /root/.ssh:/root/.ssh:ro \
+  -v ~/.ssh:~/.ssh:ro \
   ghcr.io/sky22333/ansible-ui
 ```
 建议反代并开启HTTPS加强安全性。务必设置一个强密码
@@ -50,23 +50,23 @@ docker run -d \
 
 ### 密钥认证连接主机
 
-默认会读取容器内的`/root/.ssh/id_rsa`
+默认会读取容器内的`~/.ssh/id_ed25519`
 
 可以直接宿主机生成密钥对，然后映射进去，也可以进入容器内操作
 
 **生成 SSH 密钥对**
 ```
-ssh-keygen -t rsa -b 4096
+ssh-keygen -t ed25519
 ```
-> 一路回车即可，默认生成在`/root/.ssh/id_rsa`和`id_rsa.pub`
+> 一路回车即可，默认生成在`~/.ssh/id_ed25519`和`id_ed25519.pub`
 
 **将公钥复制到目标主机**
 ```
-ssh-copy-id -i /root/.ssh/id_rsa.pub root@192.168.2.1
+ssh-copy-id -i ~/.ssh/id_ed25519.pub root@192.168.2.1
 ```
 如果你的目标主机ssh端口不是默认的22，则需要指定端口参数`-o Port=2222`
 
-这条命令会自动把`id_rsa.pub`的内容追加到目标主机的`/root/.ssh/authorized_keys`中
+这条命令会自动把`id_ed25519.pub`的内容追加到目标主机的`~/.ssh/authorized_keys`中
 
 多个主机可以使用脚本for循环批量执行
 
