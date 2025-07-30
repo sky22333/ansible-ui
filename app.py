@@ -515,7 +515,7 @@ def terminal_ws(ws, host_id):
         }
         if host['auth_method'] == 'password':
             connect_args['password'] = host['password']
-        # else: paramiko will try to use SSH agent or default keys (~/.ssh/id_ed25519)
+        # else: paramiko will try to use SSH agent or default keys (/root/.ssh/id_ed25519)
         
         ssh.connect(**connect_args)
         

@@ -56,7 +56,7 @@ class AnsibleManager:
             
             if host['auth_method'] == 'key':
                 # 使用私钥认证
-                line += "ansible_ssh_private_key_file=~/.ssh/id_ed25519 "
+                line += "ansible_ssh_private_key_file=/root/.ssh/id_ed25519 "
             elif host['auth_method'] == 'password':
                 # 使用密码认证
                 password = host.get('password')
