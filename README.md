@@ -73,35 +73,35 @@ ssh-copy-id -i /root/.ssh/id_ed25519.pub root@192.168.2.1
 
 ## 预览
 
-![1](./.github/workflows/1.jpg)
+![1](./.github/demo/1.jpg)
 
 ---
 
-![2](./.github/workflows/2.jpg)
+![2](./.github/demo/2.jpg)
 
 ---
 
-![3](./.github/workflows/3.jpg)
+![3](./.github/demo/3.jpg)
 
 ---
 
-![4](./.github/workflows/4.jpg)
+![4](./.github/demo/4.jpg)
 
 ---
 
-![5](./.github/workflows/5.jpg)
+![5](./.github/demo/5.jpg)
 
 ---
 
-![6](./.github/workflows/6.jpg)
+![6](./.github/demo/6.jpg)
 
 ---
 
-![7](./.github/workflows/7.jpg)
+![7](./.github/demo/7.jpg)
 
 ---
 
-![8](./.github/workflows/8.jpg)
+![8](./.github/demo/8.jpg)
 
 ---
 
