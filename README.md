@@ -1,5 +1,11 @@
 # Ansible Web管理面板
 
+<p align="center">
+  <a href="https://deepwiki.com/sky22333/ansible-ui">
+    <img src="./.github/demo/deepwiki.svg" alt="DeepWiki">
+  </a>
+</p>
+
 轻量级，简单易用的Ansible Web管理面板，提供批量主机管理、命令执行、文件传输和Web终端等功能。适合小白用户。
 
 <p align="center">
@@ -99,11 +105,6 @@ ssh-copy-id -i /root/.ssh/id_ed25519.pub root@192.168.2.1
 ![8](./.github/demo/8.jpg)
 
 ---
-
-### wiki
-
-[![DeepWiki](./.github/demo/deepwiki.svg)](https://deepwiki.com/sky22333/ansible-ui)
-
 
 ## Stargazers over time
 [![Stargazers over time](https://starchart.cc/sky22333/ansible-ui.svg?variant=adaptive)](https://starchart.cc/sky22333/ansible-ui)
