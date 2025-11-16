@@ -17,7 +17,11 @@
 - Web终端：通过浏览器直接连接到远程主机
 - 访问日志：记录和查看系统访问情况
 
-## [详细文档](https://zread.ai/sky22333/ansible-ui)
+## 详细文档
+
+[中文文档](https://zread.ai/sky22333/ansible-ui)
+
+[English](https://deepwiki.com/sky22333/ansible-ui)
 
 ## Docker快速部署
 ```
