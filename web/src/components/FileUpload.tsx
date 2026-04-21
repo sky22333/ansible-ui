@@ -11,7 +11,6 @@ import { getApiErrorMessage } from '@/utils/http';
 
 interface FileUploadProps {
   targetHostIds: number[] | 'all';
-  onUploadComplete: () => void; // Callback when upload finishes
   onClose: () => void; // Callback to close the dialog
 }
 
@@ -25,7 +24,7 @@ interface UploadResult {
   };
 }
 
-function FileUpload({ targetHostIds, onUploadComplete, onClose }: FileUploadProps) {
+function FileUpload({ targetHostIds, onClose }: FileUploadProps) {
   const [file, setFile] = useState<File | null>(null);
   const [remotePath, setRemotePath] = useState('/tmp/'); // Default remote path
   const [isUploading, setIsUploading] = useState(false);
@@ -96,8 +95,6 @@ function FileUpload({ targetHostIds, onUploadComplete, onClose }: FileUploadProp
           });
         }
         
-        // 不自动关闭对话框，让用户查看结果
-        onUploadComplete(); // 仅通知父组件上传完成
       } else {
         // 全部失败时的显示
         toast.error("文件上传失败", {

@@ -309,52 +309,10 @@ function MainPage() {
   };
 
   const openTerminal = (hostId: number) => {
-    // 打开新窗口
     const terminalWindow = window.open(`/terminal/${hostId}`, `terminal_${hostId}`, 'width=800,height=600');
-
-    // 确保新窗口成功打开
     if (!terminalWindow) {
       toast.error('无法打开终端', { description: '请允许浏览器打开弹出窗口' });
-      return;
     }
-
-    // 等待新窗口加载完成
-    const sendAuthInfo = () => {
-      try {
-        // 获取认证令牌
-        const token = authStorage.getToken();
-        const expiresAt = new Date();
-        expiresAt.setHours(expiresAt.getHours() + 5); // 5小时过期时间
-
-        // 如果terminalWindow可用且已加载完成，发送认证信息
-        if (terminalWindow && terminalWindow.document.readyState === 'complete') {
-          localStorage.setItem('isAuthenticated', 'true');
-          localStorage.setItem('authExpiresAt', expiresAt.toISOString());
-          if (token) {
-            localStorage.setItem('token', token);
-          }
-
-          // 尝试向新窗口发送消息，以便它可以检测认证状态
-          terminalWindow.postMessage({
-            type: 'AUTH_INFO',
-            isAuthenticated: true,
-            authExpiresAt: expiresAt.toISOString(),
-            token: token
-          }, '*');
-
-          // 移除敏感日志
-        } else {
-          // 如果窗口未完成加载，稍后再试
-          setTimeout(sendAuthInfo, 500);
-        }
-      } catch {
-        // 移除敏感日志
-        toast.error('无法连接到终端', { description: '认证信息传递失败' });
-      }
-    };
-
-    // 开始尝试发送认证信息
-    setTimeout(sendAuthInfo, 500);
   };
 
   const openUploadDialog = (target: 'selected' | 'all') => {
@@ -368,10 +326,6 @@ function MainPage() {
     }
     setUploadTarget(target);
     setIsUploadDialogOpen(true);
-  };
-
-  const handleUploadComplete = () => {
-    console.log("Upload complete callback triggered");
   };
 
   const handleCleanupAccessLogs = async () => {
@@ -396,10 +350,6 @@ function MainPage() {
     }
     setPlaybookTarget(target);
     setIsPlaybookDialogOpen(true);
-  };
-
-  const handlePlaybookComplete = () => {
-    console.log("Playbook execution complete");
   };
 
   const isAllSelected = hosts.length > 0 && selectedHostIds.length === hosts.length;
@@ -792,7 +742,6 @@ function MainPage() {
             {uploadTarget && (
               <FileUpload
                 targetHostIds={uploadTarget === 'all' ? 'all' : selectedHostIds}
-                onUploadComplete={handleUploadComplete}
                 onClose={() => setIsUploadDialogOpen(false)}
               />
             )}
@@ -812,7 +761,6 @@ function MainPage() {
             {playbookTarget && (
               <PlaybookExecutor
                 targetHostIds={playbookTarget === 'all' ? 'all' : selectedHostIds}
-                onExecutionComplete={handlePlaybookComplete}
                 onClose={() => setIsPlaybookDialogOpen(false)}
               />
             )}

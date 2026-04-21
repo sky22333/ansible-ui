@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from flask import Flask, request, jsonify, send_from_directory, Response
 from database import Database
 from ansible_manager import AnsibleManager
@@ -74,50 +75,78 @@ def handle_error(f):
             return jsonify({'error': str(e)}), 500
     return decorated_function
 
+def get_request_token():
+    """从请求中提取JWT令牌"""
+    auth_header = request.headers.get('Authorization', '')
+    if auth_header.startswith('Bearer '):
+        return auth_header.split(' ', 1)[1]
+
+    return request.cookies.get('token') or request.args.get('token')
+
+def ensure_crypto_key():
+    """确保运行期加密密钥已初始化"""
+    from crypto_utils import CRYPTO_KEY
+
+    if isinstance(CRYPTO_KEY, bytes) and len(CRYPTO_KEY) == 32:
+        return True
+
+    if not ADMIN_USERNAME or not ADMIN_PASSWORD:
+        app.logger.error("缺少管理员凭证，无法派生加密密钥")
+        return False
+
+    app.logger.info("检测到加密密钥未初始化，尝试从管理员凭证派生")
+    try:
+        key, salt = derive_key_from_credentials(ADMIN_USERNAME, ADMIN_PASSWORD)
+        set_crypto_keys(key, salt)
+        app.logger.info("密钥派生成功，长度为: %d 字节", len(key))
+        return True
+    except Exception as e:
+        app.logger.error(f"密钥派生失败: {str(e)}")
+        return False
+
+@contextmanager
+def ssh_client_for_host(host, timeout=10):
+    """为指定主机创建并管理SSH连接"""
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+    connect_args = {
+        'hostname': host['address'],
+        'port': host['port'],
+        'username': host['username'],
+        'timeout': timeout
+    }
+    if host['auth_method'] == 'password':
+        connect_args['password'] = host['password']
+
+    ssh.connect(**connect_args)
+    try:
+        yield ssh
+    finally:
+        ssh.close()
+
+@contextmanager
+def sftp_client_for_host(host, timeout=10):
+    """为指定主机创建并管理SFTP连接"""
+    with ssh_client_for_host(host, timeout=timeout) as ssh:
+        with ssh.open_sftp() as sftp:
+            yield sftp
+
 def auth_required(f):
     """JWT认证要求装饰器"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # 获取Authorization头部
-        auth_header = request.headers.get('Authorization')
-        token = None
-        
-        # 从header中提取token
-        if auth_header and auth_header.startswith('Bearer '):
-            token = auth_header.split(' ')[1]
-        
-        # 如果token不在header中，尝试从cookies获取
-        if not token:
-            token = request.cookies.get('token')
-            
-        # 如果token不在cookies中，尝试从查询参数获取(用于兼容某些场景)
-        if not token:
-            token = request.args.get('token')
-            
+        token = get_request_token()
         if not token:
             return jsonify({'error': 'Unauthorized'}), 401
-            
+
         user = decode_token(token)
         if not user:
             return jsonify({'error': 'Invalid or expired token'}), 401
-        
-        # 在每次API调用时，如果没有设置加密密钥，则从用户凭证派生
-        # 这里从crypto_utils导入全局变量
-        from crypto_utils import CRYPTO_KEY
-        
-        # 检查密钥是否有效或需要重新派生
-        if (CRYPTO_KEY is None or 
-            isinstance(CRYPTO_KEY, bytes) and (len(CRYPTO_KEY) != 32 or CRYPTO_KEY == os.urandom(32))) and ADMIN_USERNAME and ADMIN_PASSWORD:
-            # 只有在设置了环境变量时才尝试派生密钥
-            app.logger.info("API调用中检测到加密密钥未设置或无效，尝试从用户凭证派生")
-            try:
-                key, salt = derive_key_from_credentials(ADMIN_USERNAME, ADMIN_PASSWORD)
-                set_crypto_keys(key, salt)
-                app.logger.info("密钥派生成功，长度为: %d 字节", len(key))
-            except Exception as e:
-                app.logger.error(f"密钥派生失败: {str(e)}")
-                return jsonify({'error': '系统加密配置错误，请联系管理员'}), 500
-            
+
+        if not ensure_crypto_key():
+            return jsonify({'error': '系统加密配置错误，请联系管理员'}), 500
+
         # 将用户信息添加到request中，以便视图函数使用
         request.user = user
         return f(*args, **kwargs)
@@ -126,42 +155,9 @@ def auth_required(f):
 @app.before_request
 def before_request():
     app.logger.info(f"处理请求: {request.path}")
-    
+
     if request.method == 'OPTIONS':
         return None
-        
-    if request.path.startswith('/ws/'):
-        return None
-        
-    if request.path.startswith('/terminal'):
-        return None
-    
-    if request.path == '/login':
-        return None
-        
-    if request.path.startswith('/api/') and request.path != '/api/login':
-        auth_header = request.headers.get('Authorization')
-        token = None
-        
-        if auth_header and auth_header.startswith('Bearer '):
-            token = auth_header.split(' ')[1]
-        
-        if not token:
-            token = request.cookies.get('token')
-            
-        if not token:
-            token = request.args.get('token')
-            
-        if not token:
-            return jsonify({'error': 'Unauthorized'}), 401
-            
-        user = decode_token(token)
-        if not user:
-            return jsonify({'error': 'Invalid or expired token'}), 401
-            
-        request.user = user
-    else:
-        pass
 
 @app.after_request
 def after_request(response):
@@ -345,19 +341,8 @@ def add_hosts_batch():
 def update_host(host_id):
     """更新主机信息"""
     host_data = request.json
-    auth_method = host_data.get('auth_method', 'password') # 默认为密码认证
 
     required_fields = ['comment', 'address', 'username', 'port']
-    if auth_method == 'password' and 'password' in host_data and host_data['password'] != '':
-        # 如果是密码认证且提供了新密码，则密码是必需的
-        pass # 密码会在db.update_host中处理
-    elif auth_method == 'password' and ('password' not in host_data or host_data['password'] == ''):
-        # 如果是密码认证但未提供新密码，则不更新密码字段，保持原有密码
-        pass
-    elif auth_method == 'key':
-        # 如果是密钥认证，密码字段不强制要求
-        pass
-    
     if not all(field in host_data for field in required_fields):
         return jsonify({'error': 'Missing required fields'}), 400
     
@@ -503,74 +488,59 @@ def terminal_ws(ws, host_id):
     app.logger.info(f"找到主机信息: id={host_id}")
     
     try:
-        ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        
-        app.logger.info("正在连接SSH")
-        connect_args = {
-            'hostname': host['address'],
-            'port': host['port'],
-            'username': host['username'],
-            'timeout': 10
-        }
-        if host['auth_method'] == 'password':
-            connect_args['password'] = host['password']
-        # else: paramiko will try to use SSH agent or default keys (/root/.ssh/id_ed25519)
-        
-        ssh.connect(**connect_args)
-        
-        # 默认终端大小
-        term_width = 100
-        term_height = 30
-        
-        app.logger.info("SSH连接成功，创建终端会话")
-        channel = ssh.invoke_shell(term='xterm-256color', width=term_width, height=term_height)
-        
-        def send_data():
+        with ssh_client_for_host(host, timeout=10) as ssh:
+            # 默认终端大小
+            term_width = 100
+            term_height = 30
+
+            app.logger.info("SSH连接成功，创建终端会话")
+            channel = ssh.invoke_shell(term='xterm-256color', width=term_width, height=term_height)
+
+            def send_data():
+                while True:
+                    try:
+                        if channel.recv_ready():
+                            data = channel.recv(1024).decode('utf-8', errors='ignore')
+                            if data:
+                                ws.send(data)
+                        else:
+                            time.sleep(0.1)
+                    except Exception:
+                        app.logger.error("数据发送错误")
+                        break
+
+            thread = threading.Thread(target=send_data)
+            thread.daemon = True
+            thread.start()
+
+            app.logger.info("WebSocket连接已建立，后台线程已启动")
+
+            # 发送初始欢迎信息
+            welcome_msg = "\r\n\x1b[1;32m*** 已连接到主机 ***\x1b[0m\r\n"
+            ws.send(welcome_msg)
+
             while True:
                 try:
-                    if channel.recv_ready():
-                        data = channel.recv(1024).decode('utf-8', errors='ignore')
-                        if data:
-                            ws.send(data)
-                    else:
-                        time.sleep(0.1)
+                    message = ws.receive()
+                    if message is None:
+                        app.logger.info("WebSocket连接已关闭")
+                        break
+
+                    data = json.loads(message)
+                    if data['type'] == 'input':
+                        channel.send(data['data'])
+                    elif data['type'] == 'resize':
+                        new_size = data['data']
+                        channel.resize_pty(
+                            width=new_size['cols'],
+                            height=new_size['rows']
+                        )
+                except json.JSONDecodeError:
+                    app.logger.error("JSON解析错误")
+                    continue
                 except Exception:
-                    app.logger.error("数据发送错误")
+                    app.logger.error("WebSocket接收错误")
                     break
-        
-        thread = threading.Thread(target=send_data)
-        thread.daemon = True
-        thread.start()
-        
-        app.logger.info("WebSocket连接已建立，后台线程已启动")
-        
-        # 发送初始欢迎信息
-        welcome_msg = "\r\n\x1b[1;32m*** 已连接到主机 ***\x1b[0m\r\n"
-        ws.send(welcome_msg)
-        
-        while True:
-            try:
-                message = ws.receive()
-                if message is None:
-                    app.logger.info("WebSocket连接已关闭")
-                    break
-                    
-                data = json.loads(message)
-                if data['type'] == 'input':
-                    channel.send(data['data'])
-                elif data['type'] == 'resize':
-                    new_size = data['data']
-                    channel.resize_pty(
-                        width=new_size['cols'],
-                        height=new_size['rows']
-                    )
-            except json.JSONDecodeError:
-                app.logger.error("JSON解析错误")
-                continue
-            except Exception:
-                app.logger.error("WebSocket接收错误")
-                break
     
     except paramiko.AuthenticationException:
         app.logger.error("SSH认证失败")
@@ -585,8 +555,6 @@ def terminal_ws(ws, host_id):
         app.logger.info("关闭终端连接")
         if 'channel' in locals():
             channel.close()
-        if 'ssh' in locals():
-            ssh.close()
 
 @app.route('/api/sftp/<int:host_id>/list')
 @handle_error
@@ -595,29 +563,21 @@ def sftp_list(host_id):
     """获取 SFTP 文件列表"""
     path = request.args.get('path', '/')
     host = db.get_host(host_id)
-    
+
+    if not host:
+        return jsonify({'error': 'Host not found'}), 404
+
     try:
-        with paramiko.SSHClient() as ssh:
-            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            connect_args = {
-                'hostname': host['address'],
-                'port': host['port'],
-                'username': host['username']
-            }
-            if host['auth_method'] == 'password':
-                connect_args['password'] = host['password']
-            ssh.connect(**connect_args)
-            
-            with ssh.open_sftp() as sftp:
-                file_list = []
-                for entry in sftp.listdir_attr(path):
-                    file_list.append({
-                        'name': entry.filename,
-                        'type': 'directory' if stat.S_ISDIR(entry.st_mode) else 'file',
-                        'size': entry.st_size,
-                        'mtime': entry.st_mtime
-                    })
-                return jsonify(file_list)
+        with sftp_client_for_host(host) as sftp:
+            file_list = []
+            for entry in sftp.listdir_attr(path):
+                file_list.append({
+                    'name': entry.filename,
+                    'type': 'directory' if stat.S_ISDIR(entry.st_mode) else 'file',
+                    'size': entry.st_size,
+                    'mtime': entry.st_mtime
+                })
+            return jsonify(file_list)
     
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -637,23 +597,12 @@ def sftp_mkdir(host_id):
         if not path:
             return jsonify({'error': 'Path is required'}), 400
 
-        with paramiko.SSHClient() as ssh:
-            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            connect_args = {
-                'hostname': host['address'],
-                'port': host['port'],
-                'username': host['username']
-            }
-            if host['auth_method'] == 'password':
-                connect_args['password'] = host['password']
-            ssh.connect(**connect_args)
-            
-            with ssh.open_sftp() as sftp:
-                try:
-                    sftp.stat(path)
-                    return jsonify({'error': 'Directory already exists'}), 400
-                except IOError:
-                    sftp.mkdir(path)
+        with sftp_client_for_host(host) as sftp:
+            try:
+                sftp.stat(path)
+                return jsonify({'error': 'Directory already exists'}), 400
+            except IOError:
+                sftp.mkdir(path)
 
         return jsonify({'success': True})
     except Exception as e:
@@ -676,31 +625,20 @@ def sftp_upload(host_id):
 
         files = request.files.getlist('files[]')
         
-        with paramiko.SSHClient() as ssh:
-            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            connect_args = {
-                'hostname': host['address'],
-                'port': host['port'],
-                'username': host['username']
-            }
-            if host['auth_method'] == 'password':
-                connect_args['password'] = host['password']
-            ssh.connect(**connect_args)
-            
-            with ssh.open_sftp() as sftp:
-                for file in files:
-                    if file.filename:
-                        filename = secure_filename(file.filename)
-                        remote_path = os.path.join(path, filename).replace('\\', '/')
-                        
-                        temp_path = os.path.join('/tmp', filename)
-                        file.save(temp_path)
-                        
-                        try:
-                            sftp.put(temp_path, remote_path)
-                        finally:
-                            if os.path.exists(temp_path):
-                                os.remove(temp_path)
+        with sftp_client_for_host(host) as sftp:
+            for file in files:
+                if file.filename:
+                    filename = secure_filename(file.filename)
+                    remote_path = os.path.join(path, filename).replace('\\', '/')
+
+                    temp_path = os.path.join('/tmp', filename)
+                    file.save(temp_path)
+
+                    try:
+                        sftp.put(temp_path, remote_path)
+                    finally:
+                        if os.path.exists(temp_path):
+                            os.remove(temp_path)
 
         return jsonify({'success': True})
     except Exception as e:
@@ -724,23 +662,12 @@ def sftp_rename(host_id):
         if not old_path or not new_path:
             return jsonify({'error': 'Both old_path and new_path are required'}), 400
 
-        with paramiko.SSHClient() as ssh:
-            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            connect_args = {
-                'hostname': host['address'],
-                'port': host['port'],
-                'username': host['username']
-            }
-            if host['auth_method'] == 'password':
-                connect_args['password'] = host['password']
-            ssh.connect(**connect_args)
-            
-            with ssh.open_sftp() as sftp:
-                try:
-                    sftp.stat(new_path)
-                    return jsonify({'error': 'Destination already exists'}), 400
-                except IOError:
-                    sftp.rename(old_path, new_path)
+        with sftp_client_for_host(host) as sftp:
+            try:
+                sftp.stat(new_path)
+                return jsonify({'error': 'Destination already exists'}), 400
+            except IOError:
+                sftp.rename(old_path, new_path)
 
         return jsonify({'success': True})
     except Exception as e:
@@ -763,24 +690,13 @@ def sftp_touch(host_id):
         if not path:
             return jsonify({'error': 'Path is required'}), 400
 
-        with paramiko.SSHClient() as ssh:
-            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            connect_args = {
-                'hostname': host['address'],
-                'port': host['port'],
-                'username': host['username']
-            }
-            if host['auth_method'] == 'password':
-                connect_args['password'] = host['password']
-            ssh.connect(**connect_args)
-            
-            with ssh.open_sftp() as sftp:
-                try:
-                    sftp.stat(path)
-                    return jsonify({'error': 'File already exists'}), 400
-                except IOError:
-                    with sftp.file(path, 'w') as f:
-                        f.write('')
+        with sftp_client_for_host(host) as sftp:
+            try:
+                sftp.stat(path)
+                return jsonify({'error': 'File already exists'}), 400
+            except IOError:
+                with sftp.file(path, 'w') as f:
+                    f.write('')
 
         return jsonify({'success': True})
     except Exception as e:
@@ -799,21 +715,10 @@ def sftp_read(host_id):
     path = request.args.get('path')
 
     try:
-        with paramiko.SSHClient() as ssh:
-            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            connect_args = {
-                'hostname': host['address'],
-                'port': host['port'],
-                'username': host['username']
-            }
-            if host['auth_method'] == 'password':
-                connect_args['password'] = host['password']
-            ssh.connect(**connect_args)
-            
-            with ssh.open_sftp() as sftp:
-                with sftp.file(path, 'r') as f:
-                    content = f.read().decode('utf-8', errors='replace')
-                return jsonify({'content': content})
+        with sftp_client_for_host(host) as sftp:
+            with sftp.file(path, 'r') as f:
+                content = f.read().decode('utf-8', errors='replace')
+            return jsonify({'content': content})
     
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -835,20 +740,9 @@ def sftp_write(host_id):
         if not path:
             return jsonify({'error': 'Path is required'}), 400
 
-        with paramiko.SSHClient() as ssh:
-            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            connect_args = {
-                'hostname': host['address'],
-                'port': host['port'],
-                'username': host['username']
-            }
-            if host['auth_method'] == 'password':
-                connect_args['password'] = host['password']
-            ssh.connect(**connect_args)
-            
-            with ssh.open_sftp() as sftp:
-                with sftp.file(path, 'w') as f:
-                    f.write(content)
+        with sftp_client_for_host(host) as sftp:
+            with sftp.file(path, 'w') as f:
+                f.write(content)
 
         return jsonify({'success': True})
     except Exception as e:
@@ -871,25 +765,14 @@ def sftp_delete(host_id):
         if not path:
             return jsonify({'error': 'Path is required'}), 400
 
-        with paramiko.SSHClient() as ssh:
-            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            connect_args = {
-                'hostname': host['address'],
-                'port': host['port'],
-                'username': host['username']
-            }
-            if host['auth_method'] == 'password':
-                connect_args['password'] = host['password']
-            ssh.connect(**connect_args)
-            
-            with ssh.open_sftp() as sftp:
-                if is_directory:
-                    # 检查目录是否为空
-                    if sftp.listdir(path):
-                        return jsonify({'error': 'Directory is not empty'}), 400
-                    sftp.rmdir(path)
-                else:
-                    sftp.remove(path)
+        with sftp_client_for_host(host) as sftp:
+            if is_directory:
+                # 检查目录是否为空
+                if sftp.listdir(path):
+                    return jsonify({'error': 'Directory is not empty'}), 400
+                sftp.rmdir(path)
+            else:
+                sftp.remove(path)
 
         return jsonify({'success': True})
     except Exception as e:
@@ -910,39 +793,28 @@ def sftp_download(host_id):
 
     try:
         filename = os.path.basename(path)
-        with paramiko.SSHClient() as ssh:
-            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            connect_args = {
-                'hostname': host['address'],
-                'port': host['port'],
-                'username': host['username']
-            }
-            if host['auth_method'] == 'password':
-                connect_args['password'] = host['password']
-            ssh.connect(**connect_args)
-            
-            with ssh.open_sftp() as sftp:
-                # 检查文件状态
-                file_attr = sftp.stat(path)
-                if stat.S_ISDIR(file_attr.st_mode):
-                    return jsonify({'error': 'Cannot download a directory'}), 400
-                
-                # 为防止路径遍历漏洞，只处理文件名
-                temp_path = os.path.join('/tmp', secure_filename(filename))
-                sftp.get(path, temp_path)
-                
-                try:
-                    with open(temp_path, 'rb') as f:
-                        content = f.read()
-                    
-                    # 创建响应对象
-                    response = Response(content)
-                    response.headers['Content-Type'] = 'application/octet-stream'
-                    response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
-                    return response
-                finally:
-                    if os.path.exists(temp_path):
-                        os.remove(temp_path)
+        with sftp_client_for_host(host) as sftp:
+            # 检查文件状态
+            file_attr = sftp.stat(path)
+            if stat.S_ISDIR(file_attr.st_mode):
+                return jsonify({'error': 'Cannot download a directory'}), 400
+
+            # 为防止路径遍历漏洞，只处理文件名
+            temp_path = os.path.join('/tmp', secure_filename(filename))
+            sftp.get(path, temp_path)
+
+            try:
+                with open(temp_path, 'rb') as f:
+                    content = f.read()
+
+                # 创建响应对象
+                response = Response(content)
+                response.headers['Content-Type'] = 'application/octet-stream'
+                response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+                return response
+            finally:
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
     
     except Exception as e:
         app.logger.error(f"SFTP download error: {str(e)}")
@@ -970,7 +842,10 @@ def internal_error(error):
 @auth_required
 def get_access_logs():
     """获取访问日志"""
-    logs = db.get_access_logs()
+    limit = request.args.get('limit', default=100, type=int)
+    ip_filter = request.args.get('ip', '').strip()
+    path_filter = request.args.get('path', '').strip()
+    logs = db.get_access_logs(limit=limit, ip_filter=ip_filter, path_filter=path_filter)
     return jsonify(logs)
 
 @app.route('/api/access-logs/cleanup', methods=['POST'])
@@ -1134,22 +1009,6 @@ def decode_token(token):
 # 添加用于WebSocket令牌生成的函数
 def generate_ws_token(host_id):
     """生成用于WebSocket连接的令牌"""
-    # 获取Authorization头部
-    auth_header = request.headers.get('Authorization')
-    jwt_token = None
-    
-    # 从header中提取token
-    if auth_header and auth_header.startswith('Bearer '):
-        jwt_token = auth_header.split(' ')[1]
-    
-    # 如果token不在header中，尝试从cookies获取
-    if not jwt_token:
-        jwt_token = request.cookies.get('token')
-        
-    # 验证JWT令牌
-    if not jwt_token or not decode_token(jwt_token):
-        return None
-    
     timestamp = int(time.time())
     message = f"{host_id}:{timestamp}"
     
@@ -1172,11 +1031,7 @@ def get_ws_token(host_id):
     if not host:
         return jsonify({'error': 'Host not found'}), 404
         
-    token = generate_ws_token(host_id)
-    if not token:
-        return jsonify({'error': 'Unauthorized'}), 401
-        
-    return jsonify({'token': token})
+    return jsonify({'token': generate_ws_token(host_id)})
 
 @app.route('/api/playbook/execute', methods=['POST'])
 @handle_error

@@ -10,7 +10,6 @@ import { getApiErrorMessage } from '@/utils/http';
 
 interface PlaybookExecutorProps {
   targetHostIds: number[] | 'all';
-  onExecutionComplete: () => void;
   onClose: () => void;
 }
 
@@ -40,7 +39,7 @@ const defaultPlaybook = `---
         var: hello_result.stdout
 `;
 
-function PlaybookExecutor({ targetHostIds, onExecutionComplete, onClose }: PlaybookExecutorProps) {
+function PlaybookExecutor({ targetHostIds, onClose }: PlaybookExecutorProps) {
   const [playbook, setPlaybook] = useState(defaultPlaybook);
   const [isExecuting, setIsExecuting] = useState(false);
   const [executionProgress, setExecutionProgress] = useState(0);
@@ -89,8 +88,6 @@ function PlaybookExecutor({ targetHostIds, onExecutionComplete, onClose }: Playb
           });
         }
         
-        // 不自动关闭对话框，让用户查看结果
-        onExecutionComplete(); // 仅通知父组件执行完成
       } else {
         // 执行失败时的显示
         toast.error("Playbook执行失败", {

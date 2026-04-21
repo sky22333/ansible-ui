@@ -214,14 +214,30 @@ class Database:
                 VALUES (?, ?, ?, ?)
             """, (ip_address, path, status, status_code))
 
-    def get_access_logs(self, limit=100):
+    def get_access_logs(self, limit=100, ip_filter='', path_filter=''):
         """获取访问日志"""
         with self.get_connection() as conn:
-            cursor = conn.execute("""
-                SELECT * FROM access_logs 
-                ORDER BY access_time DESC 
+            clauses = []
+            params = []
+
+            if ip_filter:
+                clauses.append("ip_address LIKE ?")
+                params.append(f"%{ip_filter}%")
+
+            if path_filter:
+                clauses.append("path LIKE ?")
+                params.append(f"%{path_filter}%")
+
+            where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+            query = f"""
+                SELECT * FROM access_logs
+                {where_sql}
+                ORDER BY access_time DESC
                 LIMIT ?
-            """, (limit,))
+            """
+            params.append(limit)
+
+            cursor = conn.execute(query, tuple(params))
             return [dict(row) for row in cursor.fetchall()]
 
     def cleanup_old_logs(self):

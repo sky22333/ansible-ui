@@ -59,26 +59,3 @@ export const prepareHostData = <T extends HostPasswordState>(
   return preparedData;
 };
 
-/**
- * 获取密码显示值
- * 对于已加密的密码，显示占位符，否则显示原始值
- * @param host 主机信息
- * @returns 用于显示的密码值
- */
-export const getPasswordDisplayValue = (host?: HostPasswordState | null): string => {
-  if (!host) return '';
-  
-  // 如果密码已加密，显示占位符
-  if (isPasswordEncrypted(host)) {
-    return '********';
-  }
-  
-  // 否则显示原始密码
-  return host.password || '';
-};
-
-export default {
-  isPasswordEncrypted,
-  prepareHostData,
-  getPasswordDisplayValue,
-}; 
