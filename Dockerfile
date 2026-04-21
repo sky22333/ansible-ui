@@ -1,4 +1,4 @@
-FROM node:20-alpine AS frontend
+FROM node:22-alpine AS frontend
 
 WORKDIR /app
 
@@ -7,7 +7,7 @@ RUN npm install -g pnpm
 COPY ./web /app
 RUN pnpm install && pnpm run build
 
-FROM python:3.11-alpine
+FROM python:3.12-alpine
 
 WORKDIR /app
 
