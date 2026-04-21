@@ -19,47 +19,37 @@ import datetime
 import logging
 from crypto_utils import CryptoUtils, set_crypto_keys, derive_key_from_credentials
 
-# 新增获取客户端真实IP的函数
 def get_client_ip():
     """获取客户端真实IP地址
     优先从代理转发的头信息中获取真实IP，如不存在则返回直连IP
     """
-    # 尝试从常见的代理头中获取
     if request.headers.get('X-Forwarded-For'):
-        # 取列表中第一个IP(通常是原始客户端)
         return request.headers.get('X-Forwarded-For').split(',')[0].strip()
     elif request.headers.get('X-Real-IP'):
         return request.headers.get('X-Real-IP')
-    # 如果没有代理头，则使用直接IP
     return request.remote_addr
 
 app = Flask(__name__, static_folder='public', static_url_path='')
 app.secret_key = secrets.token_hex(32)
-# 设置令牌过期时间为5小时
 JWT_EXPIRATION = 5 * 60 * 60  # 5小时，以秒为单位
 JWT_SECRET = app.secret_key
 db = Database()
 ansible = AnsibleManager(db)
 crypto = CryptoUtils()
 
-# 账号密码变量
 ADMIN_USERNAME = os.getenv('ADMIN_USERNAME')
 ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD')
 
-# 检查必要的环境变量
 if not ADMIN_USERNAME or not ADMIN_PASSWORD:
     app.logger.warning("未设置管理员凭证环境变量(ADMIN_USERNAME/ADMIN_PASSWORD)，请设置这些环境变量以确保系统安全")
 
-# 配置WebSocket
 sock = Sock(app)
 sock.init_app(app)
 
 UPLOAD_FOLDER = '/tmp/ansible_uploads'
 
-# 确保上传目录存在
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# 简化allowed_file函数
 def allowed_file(filename):
     """检查文件是否允许上传，当前策略是允许所有文件"""
     return True
@@ -147,7 +137,6 @@ def auth_required(f):
         if not ensure_crypto_key():
             return jsonify({'error': '系统加密配置错误，请联系管理员'}), 500
 
-        # 将用户信息添加到request中，以便视图函数使用
         request.user = user
         return f(*args, **kwargs)
     return decorated_function
@@ -162,7 +151,6 @@ def before_request():
 @app.after_request
 def after_request(response):
     
-    # 记录API请求
     if request.path.startswith("/api/"):
         status = 'success' if response.status_code < 400 else 'failed'
         db.add_access_log(
@@ -181,36 +169,22 @@ def login():
     username = data.get('username')
     password = data.get('password')
 
-    # 确保环境变量已设置
     if not ADMIN_USERNAME or not ADMIN_PASSWORD:
         app.logger.error("系统未配置管理员凭证")
         return jsonify({'success': False, 'message': '系统配置错误'}), 500
 
     if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
-        # 从用户凭证派生加密密钥
         try:
             key, salt = derive_key_from_credentials(username, password)
-            
-            # 设置全局加密密钥
             set_crypto_keys(key, salt)
             app.logger.info(f"已从用户凭证成功派生加密密钥，长度为: {len(key)} 字节")
-            
-            # 生成JWT令牌
             token = generate_token('admin')
-            
-            # 创建包含token的响应
             response_data = {'success': True, 'message': '登录成功', 'token': token}
             response = jsonify(response_data)
-            
-            # 将token也存在cookie中，方便前端获取
-            # secure=True表示只在HTTPS连接中发送
-            # httponly=True表示JavaScript不能访问cookie，增加安全性
-            # samesite='Lax'防止CSRF攻击
             response.set_cookie(
                 'token', 
                 token, 
                 max_age=JWT_EXPIRATION, 
-                # secure=True, # 生产环境建议开启
                 httponly=True,
                 samesite='Lax'
             )
@@ -230,26 +204,21 @@ def serve_react_app(path):
     """处理前端路由 - 所有路由都交给React处理，除非是静态文件"""
     app.logger.info(f"serve_react_app 处理 路径: '{path}'")
     
-    # 显式处理终端路径（同时处理有斜杠和无斜杠的情况）
     if path.startswith('terminal'):
         app.logger.info(f"明确处理终端路径: {path}")
         return send_from_directory(app.static_folder, 'index.html')
     
-    # 如果是API请求或WebSocket路由，不处理（已有专门的处理器）
     if path.startswith('api/') or path.startswith('ws/'):
         app.logger.info(f"API或WebSocket路径，返回404: {path}")
         return jsonify({'error': 'Not found'}), 404
     
-    # 检查请求的路径是否对应 public 目录下的一个实际存在的文件
     static_file_path = os.path.join(app.static_folder, path)
     app.logger.info(f"尝试查找静态文件: {static_file_path}")
     if path != "" and os.path.exists(static_file_path) and not os.path.isdir(static_file_path):
         app.logger.info(f"找到静态文件，返回: {static_file_path}")
-        # 如果是实际文件（如 CSS, JS, 图片），则直接提供该文件
         return send_from_directory(app.static_folder, path)
     else:
         app.logger.info(f"未找到静态文件，返回index.html用于前端路由: {path}")
-        # 否则，提供 public/index.html，让 React Router 处理路由
         return send_from_directory(app.static_folder, 'index.html')
 
 @app.route('/api/hosts', methods=['GET'])
@@ -259,14 +228,11 @@ def get_hosts():
     """获取所有主机列表"""
     hosts = db.get_hosts()
     for host in hosts:
-        # 不返回明文密码到前端，但保留加密形式用于识别
-        # 根据认证方式调整 is_password_encrypted 的含义
         if host['auth_method'] == 'password':
             host['is_password_encrypted'] = crypto.is_encrypted(host['encrypted_password'])
         else:
-            host['is_password_encrypted'] = False # 密钥认证，没有加密密码
-        host['password'] = '********' # 始终不返回明文密码
-        # 删除不需要返回的字段
+            host['is_password_encrypted'] = False
+        host['password'] = '********'
         if 'encrypted_password' in host:
             del host['encrypted_password']
     return jsonify(hosts)
@@ -278,13 +244,11 @@ def get_host(host_id):
     """获取单个主机信息"""
     host = db.get_host(host_id)
     if host:
-        # 根据认证方式调整 is_password_encrypted 的含义
         if host['auth_method'] == 'password':
             host['is_password_encrypted'] = crypto.is_encrypted(host['encrypted_password'])
         else:
-            host['is_password_encrypted'] = False # 密钥认证，没有加密密码
-        host['password'] = '********' # 始终不返回明文密码
-        # 删除不需要返回的字段
+            host['is_password_encrypted'] = False
+        host['password'] = '********'
         if 'encrypted_password' in host:
             del host['encrypted_password']
         return jsonify(host)
@@ -346,7 +310,6 @@ def update_host(host_id):
     if not all(field in host_data for field in required_fields):
         return jsonify({'error': 'Missing required fields'}), 400
     
-    # 检查主机是否存在
     if not db.get_host(host_id):
         return jsonify({'error': 'Host not found'}), 404
         
@@ -358,7 +321,6 @@ def update_host(host_id):
 @auth_required
 def delete_host(host_id):
     """删除主机"""
-    # 检查主机是否存在
     if not db.get_host(host_id):
         return jsonify({'error': 'Host not found'}), 404
         
@@ -377,7 +339,6 @@ def execute_command():
     if not command:
         return jsonify({'error': 'Command is required'}), 400
 
-    # 确定目标主机
     if host_ids == 'all':
         target_hosts = db.get_hosts()
     else:
@@ -394,7 +355,6 @@ def execute_command():
     if not target_hosts:
         return jsonify({'error': 'No valid target hosts'}), 400
 
-    # 执行命令并获取结果
     results = ansible.execute_command(command, target_hosts)
     return jsonify(results)
 
@@ -426,10 +386,7 @@ def ping_host(host_id):
     if not host:
         return jsonify({'error': 'Host not found'}), 404
     
-    # 使用 Ansible 执行 ping 模块
     results = ansible.execute_ping([host])
-    
-    # 解析结果
     host_address = host['address']
     if host_address in results['success']:
         return jsonify({'status': 'success', 'message': '连接正常'})
@@ -443,27 +400,23 @@ def terminal_ws(ws, host_id):
     """处理终端 WebSocket 连接"""
     app.logger.info(f"处理WebSocket连接请求: host_id={host_id}")
     
-    # 检查授权令牌
     token = request.args.get('token')
     if not token:
         app.logger.error("终端WebSocket错误: 未提供令牌")
         ws.send(json.dumps({"error": "Authorization required"}))
         return
     
-    # 验证令牌是否有效
     try:
-        # 令牌格式：host_id:timestamp:签名
+        # token 格式: host_id:timestamp:signature
         parts = token.split(':')
         if len(parts) != 3 or parts[0] != str(host_id):
             raise ValueError("Invalid token format")
             
-        # 检查时间戳是否在有效期内（5分钟）
         token_timestamp = int(parts[1])
         current_time = int(time.time())
         if current_time - token_timestamp > 300:  # 5分钟有效期
             raise ValueError("Token expired")
             
-        # 验证签名
         message = f"{host_id}:{token_timestamp}"
         expected_signature = hmac.new(
             app.secret_key.encode(),
@@ -489,7 +442,6 @@ def terminal_ws(ws, host_id):
     
     try:
         with ssh_client_for_host(host, timeout=10) as ssh:
-            # 默认终端大小
             term_width = 100
             term_height = 30
 
@@ -515,7 +467,6 @@ def terminal_ws(ws, host_id):
 
             app.logger.info("WebSocket连接已建立，后台线程已启动")
 
-            # 发送初始欢迎信息
             welcome_msg = "\r\n\x1b[1;32m*** 已连接到主机 ***\x1b[0m\r\n"
             ws.send(welcome_msg)
 
@@ -767,7 +718,6 @@ def sftp_delete(host_id):
 
         with sftp_client_for_host(host) as sftp:
             if is_directory:
-                # 检查目录是否为空
                 if sftp.listdir(path):
                     return jsonify({'error': 'Directory is not empty'}), 400
                 sftp.rmdir(path)
@@ -794,12 +744,11 @@ def sftp_download(host_id):
     try:
         filename = os.path.basename(path)
         with sftp_client_for_host(host) as sftp:
-            # 检查文件状态
             file_attr = sftp.stat(path)
             if stat.S_ISDIR(file_attr.st_mode):
                 return jsonify({'error': 'Cannot download a directory'}), 400
 
-            # 为防止路径遍历漏洞，只处理文件名
+            # 仅使用文件名，避免目录遍历。
             temp_path = os.path.join('/tmp', secure_filename(filename))
             sftp.get(path, temp_path)
 
@@ -807,7 +756,6 @@ def sftp_download(host_id):
                 with open(temp_path, 'rb') as f:
                     content = f.read()
 
-                # 创建响应对象
                 response = Response(content)
                 response.headers['Content-Type'] = 'application/octet-stream'
                 response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
@@ -825,11 +773,9 @@ def not_found_error(error):
     """处理404错误"""
     app.logger.error(f"404错误: 路径={request.path}, IP={request.remote_addr}, 方法={request.method}")
     
-    # 如果是API或WebSocket请求，返回JSON错误
     if request.path.startswith('/api/') or request.path.startswith('/ws/'):
         return jsonify({'error': 'Not found'}), 404
     
-    # 其他所有路径交给前端路由处理，与serve_react_app一致
     return send_from_directory(app.static_folder, 'index.html')
 
 @app.errorhandler(500)
@@ -879,12 +825,10 @@ def api_upload():
         remote_path = request.form.get('remote_path', '/tmp/')
         hosts_json = request.form.get('hosts', 'all')
         
-        # 保存文件
         file_path = os.path.join(UPLOAD_FOLDER, filename)
         file.save(file_path)
         
         try:
-            # 确定上传类型和目标主机
             remote_file_path = os.path.join(remote_path, filename).replace('\\', '/')
             
             if hosts_json != 'all':
@@ -895,38 +839,27 @@ def api_upload():
                 except json.JSONDecodeError:
                     return jsonify({'error': '无效的主机列表格式'}), 400
                 
-                # 查找选中的主机信息，为后续记录结果做准备
                 host_ids = [str(h) for h in hosts]
                 all_hosts = db.get_hosts()
                 host_map = {str(h['id']): h for h in all_hosts}
-                
-                # 调用ansible执行文件上传
                 result = ansible.copy_file_to_hosts(file_path, remote_file_path, hosts)
             else:
-                # 获取所有主机信息，为后续记录结果做准备
                 all_hosts = db.get_hosts()
                 host_map = {str(h['id']): h for h in all_hosts}
                 host_ids = list(host_map.keys())
-                
-                # 上传到所有主机
                 result = ansible.copy_file_to_all(file_path, remote_file_path)
             
-            # 删除临时文件
             if os.path.exists(file_path):
                 os.remove(file_path)
             
-            # 处理结果，区分完全成功、部分成功和完全失败
             successful_hosts = []
             failed_hosts = {}
             
-            # 处理成功的主机
             for host, res in result.get('success', {}).items():
-                # 从host_map中找到对应的主机ID
                 host_id = next((id for id, h in host_map.items() if h['address'] == host), None)
                 if host_id:
                     successful_hosts.append(host_id)
             
-            # 处理失败和不可达的主机
             for host, res in result.get('failed', {}).items():
                 host_id = next((id for id, h in host_map.items() if h['address'] == host), None)
                 if host_id:
@@ -937,11 +870,9 @@ def api_upload():
                 if host_id:
                     failed_hosts[host_id] = '主机不可达'
             
-            # 计算成功率和整体状态
             total = len(host_ids)
             succeeded = len(successful_hosts)
             
-            # 确定响应状态
             if succeeded == total:  # 全部成功
                 return jsonify({
                     'success': True,
@@ -972,7 +903,6 @@ def api_upload():
                 
         except Exception as e:
             app.logger.error(f"文件上传失败: {str(e)}")
-            # 确保出错时也删除临时文件
             if os.path.exists(file_path):
                 os.remove(file_path)
             return jsonify({
@@ -986,7 +916,6 @@ def api_upload():
     
     return jsonify({'error': '不支持的文件类型'}), 400
 
-# 新的JWT相关函数
 def generate_token(user_id):
     """生成JWT令牌"""
     payload = {
@@ -1006,23 +935,19 @@ def decode_token(token):
     except jwt.InvalidTokenError:
         return None
 
-# 添加用于WebSocket令牌生成的函数
 def generate_ws_token(host_id):
     """生成用于WebSocket连接的令牌"""
     timestamp = int(time.time())
     message = f"{host_id}:{timestamp}"
     
-    # 使用app.secret_key作为密钥生成HMAC签名
     signature = hmac.new(
         app.secret_key.encode(),
         message.encode(),
         hashlib.sha256
     ).hexdigest()
     
-    # 返回格式: host_id:timestamp:signature
     return f"{host_id}:{timestamp}:{signature}"
 
-# 添加API端点用于获取WebSocket令牌
 @app.route('/api/ws-token/<int:host_id>', methods=['GET'])
 @auth_required
 def get_ws_token(host_id):
@@ -1042,23 +967,17 @@ def execute_playbook():
     playbook_content = data.get('playbook')
     host_ids = data.get('host_ids', [])
     
-    # 验证输入
     if not playbook_content:
         return jsonify({'error': '未提供Playbook内容'}), 400
     
-    # 如果指定了主机ID，则获取这些主机的信息
     target_hosts = None
     if host_ids:
         target_hosts = [db.get_host(host_id) for host_id in host_ids]
-        # 过滤掉不存在的主机
         target_hosts = [host for host in target_hosts if host]
     
-    # 执行Playbook
     try:
         result = ansible.execute_custom_playbook(playbook_content, target_hosts)
         
-        # 记录执行日志
-        # 如果有指定主机，则为每个主机记录一条日志
         if target_hosts:
             for host in target_hosts:
                 host_status = 'success'
@@ -1074,7 +993,6 @@ def execute_playbook():
                     host_status
                 )
         else:
-            # 如果没有指定主机，则记录一个通用日志
             db.log_command(
                 None,
                 'Custom Playbook Execution',

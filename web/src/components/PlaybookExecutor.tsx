@@ -13,7 +13,6 @@ interface PlaybookExecutorProps {
   onClose: () => void;
 }
 
-// 执行结果接口
 interface PlaybookResult {
   success: boolean;
   return_code: number;
@@ -52,44 +51,35 @@ function PlaybookExecutor({ targetHostIds, onClose }: PlaybookExecutorProps) {
     }
 
     setIsExecuting(true);
-    setExecutionProgress(10); // 开始进度
+    setExecutionProgress(10);
     setExecutionResult(null);
 
     try {
-      // 准备请求数据
       const requestData = {
         playbook: playbook.trim(),
         host_ids: targetHostIds === 'all' ? [] : targetHostIds,
       };
 
-      // 发送请求执行Playbook
       setExecutionProgress(30);
       const response = await api.post<PlaybookResult>("/api/playbook/execute", requestData);
       setExecutionProgress(100);
 
-      // 保存执行结果
       setExecutionResult(response.data);
-      
-      // 根据返回结果显示不同的消息
       if (response.data.success) {
         const successCount = response.data.summary.success.length;
         const failedCount = response.data.summary.failed.length;
         const unreachableCount = response.data.summary.unreachable.length;
         
         if (failedCount === 0 && unreachableCount === 0) {
-          // 全部成功
           toast.success("Playbook执行成功", { 
             description: `成功执行Playbook，所有主机任务完成` 
           });
         } else {
-          // 部分成功
           toast.warning("Playbook部分执行成功", { 
             description: `成功: ${successCount}台, 失败: ${failedCount}台, 不可达: ${unreachableCount}台` 
           });
         }
-        
       } else {
-        // 执行失败时的显示
         toast.error("Playbook执行失败", {
           description: `执行失败，返回代码: ${response.data.return_code}`,
         });
@@ -125,7 +115,6 @@ function PlaybookExecutor({ targetHostIds, onClose }: PlaybookExecutorProps) {
         <Progress value={executionProgress} className="w-full" />
       )}
 
-      {/* 执行结果显示区域 */}
       {executionResult && (
         <div className="border rounded-md p-3 bg-muted/90">
           <h4 className="text-sm font-medium mb-2">执行结果</h4>

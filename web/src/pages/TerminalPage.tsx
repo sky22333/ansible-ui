@@ -3,16 +3,14 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { isAxiosError } from 'axios';
 import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
-// import { WebLinksAddon } from '@xterm/addon-web-links'; // Corrected import if needed
 import 'xterm/css/xterm.css';
 import { Button } from '@/components/ui/button';
 import { ReloadIcon, CheckCircledIcon, CrossCircledIcon } from '@radix-ui/react-icons';
-import { toast } from "sonner"; // Updated import for sonner
+import { toast } from "sonner";
 import { authStorage } from '@/contexts/auth-storage';
 import api from '@/services/api';
 import { getApiErrorMessage } from '@/utils/http';
 
-// Define the shape of the resize message data
 interface ResizeData {
   cols: number;
   rows: number;
@@ -129,26 +127,19 @@ function TerminalPage() {
     }
   }, [fetchWsToken, hostId, sendResize, wsToken]);
   
-  // 检查认证状态
   useEffect(() => {
-    // 在组件挂载时检查是否已认证
     const isAuthenticated = authStorage.getAuth();
     const hasToken = !!authStorage.getToken();
     
     if (!isAuthenticated || !hasToken) {
-      // 如果未认证，显示提示信息
       toast.error("需要登录", { description: "请先登录系统才能使用终端功能" });
-      
-      // 跳转到登录页
       navigate('/login', { replace: true });
       return;
     }
     
-    // 获取WebSocket令牌
     void fetchWsToken();
     
     return () => {
-      // 组件卸载时清理
       if (socket.current) {
         socket.current.close();
       }
@@ -168,8 +159,8 @@ function TerminalPage() {
       fontSize: 14,
       fontFamily: 'Menlo, Monaco, "Courier New", monospace',
       theme: {
-        background: '#1e1e1e', // Dark background
-        foreground: '#d4d4d4', // Light foreground
+        background: '#1e1e1e',
+        foreground: '#d4d4d4',
         cursor: '#ffffff',
         selectionBackground: '#264f78',
         black: '#000000',
@@ -190,7 +181,7 @@ function TerminalPage() {
         brightWhite: '#e5e5e5',
       },
       allowTransparency: false,
-      scrollback: 5000, // Increase scrollback buffer
+      scrollback: 5000,
     });
 
     fitAddon.current = new FitAddon();
@@ -281,7 +272,6 @@ function TerminalPage() {
           </Button>
         </div>
       </header>
-      {/* Terminal container takes remaining height */}
       <div ref={terminalRef} className="flex-grow p-1 w-full h-full overflow-hidden"></div>
     </div>
   );

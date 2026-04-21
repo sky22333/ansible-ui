@@ -22,7 +22,6 @@ import { prepareHostData } from '@/utils/crypto';
 import { Switch } from "@/components/ui/switch";
 import { getApiErrorMessage } from '@/utils/http';
 
-// Define Host type based on backend API
 interface Host {
   id: number;
   comment: string;
@@ -35,7 +34,6 @@ interface Host {
   auth_method?: 'password' | 'key';
 }
 
-// Define Access Log type
 interface AccessLog {
   id: number;
   access_time: string;
@@ -61,8 +59,8 @@ function MainPage() {
   const [accessLogPathFilter, setAccessLogPathFilter] = useState('');
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [uploadTarget, setUploadTarget] = useState<'selected' | 'all' | null>(null);
-  const [isBatchAddOpen, setIsBatchAddOpen] = useState(false); // Control batch add dialog
-  const [isAuthChecking, setIsAuthChecking] = useState(true); // 新增：认证检查状态
+  const [isBatchAddOpen, setIsBatchAddOpen] = useState(false);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [isPlaybookDialogOpen, setIsPlaybookDialogOpen] = useState(false);
   const [playbookTarget, setPlaybookTarget] = useState<'selected' | 'all' | null>(null);
   const [useKeyAuth, setUseKeyAuth] = useState(() => {
@@ -93,13 +91,11 @@ function MainPage() {
     }
   }, [notifyRequestError]);
 
-  // 改进后的认证状态检查逻辑
   useEffect(() => {
     const checkAuth = () => {
       try {
         const isLocalAuth = authStorage.getAuth();
 
-        // 如果既没有React context认证也没有localStorage认证，则跳转到登录页
         if (!isAuthenticated && !isLocalAuth) {
           navigate('/login');
           return false;
@@ -110,19 +106,15 @@ function MainPage() {
       }
     };
 
-    // 立即检查认证状态
     const isAuthed = checkAuth();
 
-    // 只有通过了认证检查，才执行后续的数据加载
     if (isAuthed) {
       void fetchHosts();
     }
 
-    // 完成认证检查
     setIsAuthChecking(false);
   }, [fetchHosts, isAuthenticated, navigate]);
 
-  // 持久化密钥认证开关状态
   useEffect(() => {
     localStorage.setItem('useKeyAuth', JSON.stringify(useKeyAuth));
   }, [useKeyAuth]);
@@ -183,7 +175,6 @@ function MainPage() {
     }
     setIsAddingHost(true);
     try {
-      // 对每个主机数据进行处理
       const processedHostsData = hostsData.map(host => prepareHostData(host, undefined, useKeyAuth));
       const response = await api.post('/api/hosts/batch', processedHostsData);
       toast.success("成功", { description: response.data.message || `成功添加 ${response.data.count} 台主机` });
@@ -198,7 +189,6 @@ function MainPage() {
   };
 
   const handleEditHost = (host: Host) => {
-    // 确保编辑时有默认的认证方式
     const hostWithDefaults = {
       ...host,
       auth_method: host.auth_method || 'password'
@@ -210,7 +200,6 @@ function MainPage() {
     if (!editingHost) return;
     setIsEditingHost(true);
     try {
-      // 处理主机数据，特别是密码字段
       const dataToSend = prepareHostData(editedHost, editingHost, editedHost.auth_method === 'key');
 
       await api.put(`/api/hosts/${editingHost.id}`, dataToSend);
@@ -355,7 +344,6 @@ function MainPage() {
   const isAllSelected = hosts.length > 0 && selectedHostIds.length === hosts.length;
   const isIndeterminate = selectedHostIds.length > 0 && selectedHostIds.length < hosts.length;
 
-  // 添加加载指示器
   if (isAuthChecking) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -442,7 +430,6 @@ function MainPage() {
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Host Management Panel (Takes 2/3 width on large screens) */}
           <Card className="lg:col-span-2">
             <CardHeader>
               <CardTitle>主机管理</CardTitle>
@@ -474,7 +461,7 @@ function MainPage() {
                       <div className="grid gap-4 py-4">
                         <Textarea
                           placeholder="需遵循示例格式输入"
-                          rows={5} // Reduced rows
+                          rows={5}
                           value={batchInput}
                           onChange={(e) => setBatchInput(e.target.value)}
                           className="placeholder:opacity-40 batch-input-textarea"
@@ -536,7 +523,6 @@ function MainPage() {
                 </div>
               </div>
 
-              {/* Host List Table - Responsive Container */}
               <div className="border rounded-md overflow-x-auto">
                 <Table>
                   <TableHeader>
@@ -626,7 +612,6 @@ function MainPage() {
                                 </DialogHeader>
                                 {editingHost && (
                                   <div className="grid gap-4 py-4">
-                                    {/* Form fields remain the same */}
                                     <div className="grid grid-cols-4 items-center gap-4">
                                       <Label htmlFor="edit-comment" className="text-right">备注</Label>
                                       <Input id="edit-comment" value={editingHost.comment} onChange={(e) => setEditingHost({ ...editingHost, comment: e.target.value })} className="col-span-3" />
@@ -692,7 +677,6 @@ function MainPage() {
             </CardContent>
           </Card>
 
-          {/* Command Execution Panel (Takes 1/3 width on large screens) */}
           <Card className="lg:col-span-1">
             <CardHeader>
               <CardTitle>命令区域</CardTitle>
@@ -719,7 +703,6 @@ function MainPage() {
                 </Button>
               </div>
 
-              {/* Command Log Output - Takes remaining space */}
               <div className="flex flex-col flex-grow min-h-[200px]">
                 <h3 className="text-lg font-semibold mb-2">执行日志</h3>
                 <div className="border rounded-md p-3 flex-grow overflow-y-auto bg-muted/90 dark:bg-muted/90 text-sm font-mono whitespace-pre-wrap">
@@ -730,7 +713,6 @@ function MainPage() {
           </Card>
         </div>
 
-        {/* File Upload Dialog */}
         <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
           <DialogContent className="sm:max-w-[525px]">
             <DialogHeader>
@@ -748,7 +730,6 @@ function MainPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Playbook Execution Dialog */}
         <Dialog open={isPlaybookDialogOpen} onOpenChange={setIsPlaybookDialogOpen}>
           <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto dialog-content-scroll-hide">
             <DialogHeader>
@@ -767,7 +748,6 @@ function MainPage() {
           </DialogContent>
         </Dialog>
 
-        {/* GitHub Link */}
         <div className="text-center mt-6 mb-2">
           <a
             href="https://github.com/sky22333/ansible-ui"

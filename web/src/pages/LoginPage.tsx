@@ -13,7 +13,6 @@ function LoginPage() {
   const [errorMessage, setErrorMessage] = useState('');
   const navigate = useNavigate();
   const { login } = useAuth();
-  // No need for useToast hook anymore
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

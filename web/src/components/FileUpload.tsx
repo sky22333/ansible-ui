@@ -3,18 +3,17 @@ import { useDropzone } from 'react-dropzone';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Progress } from "@/components/ui/progress"; // Import Progress component
-import { UploadCloudIcon, FileIcon, XIcon, CheckCircleIcon, XCircleIcon } from 'lucide-react'; // Using lucide-react icons
+import { Progress } from "@/components/ui/progress";
+import { UploadCloudIcon, FileIcon, XIcon, CheckCircleIcon, XCircleIcon } from 'lucide-react';
 import { toast } from "sonner";
 import api from '@/services/api';
 import { getApiErrorMessage } from '@/utils/http';
 
 interface FileUploadProps {
   targetHostIds: number[] | 'all';
-  onClose: () => void; // Callback to close the dialog
+  onClose: () => void;
 }
 
-// 新增上传结果接口
 interface UploadResult {
   success: boolean;
   message: string;
@@ -26,7 +25,7 @@ interface UploadResult {
 
 function FileUpload({ targetHostIds, onClose }: FileUploadProps) {
   const [file, setFile] = useState<File | null>(null);
-  const [remotePath, setRemotePath] = useState('/tmp/'); // Default remote path
+  const [remotePath, setRemotePath] = useState('/tmp/');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
@@ -34,14 +33,14 @@ function FileUpload({ targetHostIds, onClose }: FileUploadProps) {
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
       setFile(acceptedFiles[0]);
-      setUploadProgress(0); // Reset progress when a new file is selected
-      setUploadResult(null); // Reset previous results
+      setUploadProgress(0);
+      setUploadResult(null);
     }
   }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    multiple: false, // Allow only single file upload
+    multiple: false,
   });
 
   const handleUpload = async () => {
@@ -61,7 +60,7 @@ function FileUpload({ targetHostIds, onClose }: FileUploadProps) {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('remote_path', remotePath.trim());
-    formData.append('hosts', JSON.stringify(targetHostIds)); // Send hosts as JSON string
+    formData.append('hosts', JSON.stringify(targetHostIds));
 
     try {
       const response = await api.post<UploadResult>("/api/upload", formData, {
@@ -74,29 +73,22 @@ function FileUpload({ targetHostIds, onClose }: FileUploadProps) {
         },
       });
 
-      // 保存上传结果
       setUploadResult(response.data);
-      
-      // 根据返回结果显示不同的消息
       if (response.data.success) {
         const details = response.data.details;
         const succeededCount = details?.succeeded.length || 0;
         const failedCount = Object.keys(details?.failed || {}).length;
         
         if (failedCount === 0) {
-          // 全部成功
           toast.success("文件上传成功", { 
             description: `文件已成功上传到所有目标主机的 ${remotePath}` 
           });
         } else {
-          // 部分成功
           toast.warning("文件部分上传成功", { 
             description: `成功: ${succeededCount}台, 失败: ${failedCount}台. 查看详情以了解更多信息。` 
           });
         }
-        
       } else {
-        // 全部失败时的显示
         toast.error("文件上传失败", {
           description: response.data.message || "所有主机上传失败",
         });
@@ -164,7 +156,6 @@ function FileUpload({ targetHostIds, onClose }: FileUploadProps) {
         <p className="text-xs text-muted-foreground">文件将被上传到目标主机的这个目录下。</p>
       </div>
 
-      {/* 上传结果显示区域 */}
       {uploadResult && (
         <div className="border rounded-md p-3 bg-muted/90">
           <h4 className="text-sm font-medium mb-2">上传结果</h4>
