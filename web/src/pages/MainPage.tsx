@@ -318,7 +318,7 @@ function MainPage() {
   };
 
   const handleCleanupAccessLogs = async () => {
-    if (!confirm('确定要清理7天前的访问日志吗？')) return;
+    if (!confirm('确定要清理3天前的访问日志和命令日志吗？')) return;
     try {
       const response = await api.post('/api/access-logs/cleanup');
       toast.success("成功", { description: response.data.message });
@@ -420,7 +420,7 @@ function MainPage() {
                 </div>
               </div>
               <SheetFooter>
-                <Button variant="outline" onClick={handleCleanupAccessLogs} className="text-black dark:text-white">清理7天前日志</Button>
+                <Button variant="outline" onClick={handleCleanupAccessLogs} className="text-black dark:text-white">清理3天前日志</Button>
                 <SheetClose asChild>
                   <Button variant="outline">关闭</Button>
                 </SheetClose>

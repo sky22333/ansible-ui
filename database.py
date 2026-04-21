@@ -248,9 +248,13 @@ class Database:
             return [dict(row) for row in cursor.fetchall()]
 
     def cleanup_old_logs(self):
-        """清理7天前的日志（使用北京时间）"""
+        """清理3天前的访问日志和命令日志（使用北京时间）"""
         with self.get_connection() as conn:
             conn.execute("""
                 DELETE FROM access_logs 
-                WHERE access_time < datetime('now', '+8 hours', '-7 days')
+                WHERE access_time < datetime('now', '+8 hours', '-3 days')
+            """)
+            conn.execute("""
+                DELETE FROM command_logs
+                WHERE datetime(executed_at, '+8 hours') < datetime('now', '+8 hours', '-3 days')
             """)

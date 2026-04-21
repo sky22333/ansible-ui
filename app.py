@@ -17,6 +17,7 @@ import hashlib
 import jwt
 import datetime
 import logging
+from logging.handlers import RotatingFileHandler
 from crypto_utils import CryptoUtils, set_crypto_keys, derive_key_from_credentials
 
 def get_client_ip():
@@ -800,7 +801,7 @@ def get_access_logs():
 def cleanup_logs():
     """清理旧日志"""
     db.cleanup_old_logs()
-    return jsonify({'message': '已清理7天前的日志'})
+    return jsonify({'message': '已清理3天前的访问日志和命令日志'})
 
 def create_required_directories():
     """创建必要的目录"""
@@ -1008,10 +1009,18 @@ def execute_playbook():
 if __name__ == '__main__':
     create_required_directories()
 
-    logging.basicConfig(
-        filename='logs/app.log',
-        level=logging.INFO,
-        format='%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+    file_handler = RotatingFileHandler(
+        'logs/app.log',
+        maxBytes=1_048_576,
+        backupCount=3,
     )
+    file_handler.setFormatter(logging.Formatter(
+        '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+    ))
+
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+    root_logger.handlers.clear()
+    root_logger.addHandler(file_handler)
     
     app.run(host='0.0.0.0', port=5000)
