@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_from_directory, Response, render_template, redirect, url_for
+from flask import Flask, request, jsonify, send_from_directory, Response
 from database import Database
 from ansible_manager import AnsibleManager
 import json
@@ -103,7 +103,7 @@ def auth_required(f):
         
         # 在每次API调用时，如果没有设置加密密钥，则从用户凭证派生
         # 这里从crypto_utils导入全局变量
-        from crypto_utils import CRYPTO_KEY, CRYPTO_SALT
+        from crypto_utils import CRYPTO_KEY
         
         # 检查密钥是否有效或需要重新派生
         if (CRYPTO_KEY is None or 
@@ -461,7 +461,7 @@ def terminal_ws(ws, host_id):
     # 检查授权令牌
     token = request.args.get('token')
     if not token:
-        app.logger.error(f"终端WebSocket错误: 未提供令牌")
+        app.logger.error("终端WebSocket错误: 未提供令牌")
         ws.send(json.dumps({"error": "Authorization required"}))
         return
     
@@ -489,14 +489,14 @@ def terminal_ws(ws, host_id):
         if parts[2] != expected_signature:
             raise ValueError("Invalid token signature")
             
-    except Exception as e:
-        app.logger.error(f"终端WebSocket令牌验证失败")
+    except Exception:
+        app.logger.error("终端WebSocket令牌验证失败")
         ws.send(json.dumps({"error": "Invalid or expired token"}))
         return
     
     host = db.get_host(host_id)
     if not host:
-        app.logger.error(f"终端WebSocket错误: 主机ID不存在")
+        app.logger.error("终端WebSocket错误: 主机ID不存在")
         ws.send(json.dumps({"error": "Host not found"}))
         return
     
@@ -506,7 +506,7 @@ def terminal_ws(ws, host_id):
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         
-        app.logger.info(f"正在连接SSH")
+        app.logger.info("正在连接SSH")
         connect_args = {
             'hostname': host['address'],
             'port': host['port'],
@@ -523,7 +523,7 @@ def terminal_ws(ws, host_id):
         term_width = 100
         term_height = 30
         
-        app.logger.info(f"SSH连接成功，创建终端会话")
+        app.logger.info("SSH连接成功，创建终端会话")
         channel = ssh.invoke_shell(term='xterm-256color', width=term_width, height=term_height)
         
         def send_data():
@@ -535,25 +535,25 @@ def terminal_ws(ws, host_id):
                             ws.send(data)
                     else:
                         time.sleep(0.1)
-                except Exception as e:
-                    app.logger.error(f"数据发送错误")
+                except Exception:
+                    app.logger.error("数据发送错误")
                     break
         
         thread = threading.Thread(target=send_data)
         thread.daemon = True
         thread.start()
         
-        app.logger.info(f"WebSocket连接已建立，后台线程已启动")
+        app.logger.info("WebSocket连接已建立，后台线程已启动")
         
         # 发送初始欢迎信息
-        welcome_msg = f"\r\n\x1b[1;32m*** 已连接到主机 ***\x1b[0m\r\n"
+        welcome_msg = "\r\n\x1b[1;32m*** 已连接到主机 ***\x1b[0m\r\n"
         ws.send(welcome_msg)
         
         while True:
             try:
                 message = ws.receive()
                 if message is None:
-                    app.logger.info(f"WebSocket连接已关闭")
+                    app.logger.info("WebSocket连接已关闭")
                     break
                     
                 data = json.loads(message)
@@ -565,24 +565,24 @@ def terminal_ws(ws, host_id):
                         width=new_size['cols'],
                         height=new_size['rows']
                     )
-            except json.JSONDecodeError as e:
-                app.logger.error(f"JSON解析错误")
+            except json.JSONDecodeError:
+                app.logger.error("JSON解析错误")
                 continue
-            except Exception as e:
-                app.logger.error(f"WebSocket接收错误")
+            except Exception:
+                app.logger.error("WebSocket接收错误")
                 break
     
     except paramiko.AuthenticationException:
-        app.logger.error(f"SSH认证失败")
-        ws.send(f'\r\n\x1b[1;31m*** SSH认证失败 ***\x1b[0m\r\n')
-    except paramiko.SSHException as e:
-        app.logger.error(f"SSH连接错误")
-        ws.send(f'\r\n\x1b[1;31m*** SSH连接错误 ***\x1b[0m\r\n')
-    except Exception as e:
-        app.logger.error(f"终端连接错误")
-        ws.send(f'\r\n\x1b[1;31m*** 连接错误 ***\x1b[0m\r\n')
+        app.logger.error("SSH认证失败")
+        ws.send('\r\n\x1b[1;31m*** SSH认证失败 ***\x1b[0m\r\n')
+    except paramiko.SSHException:
+        app.logger.error("SSH连接错误")
+        ws.send('\r\n\x1b[1;31m*** SSH连接错误 ***\x1b[0m\r\n')
+    except Exception:
+        app.logger.error("终端连接错误")
+        ws.send('\r\n\x1b[1;31m*** 连接错误 ***\x1b[0m\r\n')
     finally:
-        app.logger.info(f"关闭终端连接")
+        app.logger.info("关闭终端连接")
         if 'channel' in locals():
             channel.close()
         if 'ssh' in locals():

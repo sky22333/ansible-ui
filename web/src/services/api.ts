@@ -1,5 +1,5 @@
 import axios, { InternalAxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
-import { authStorage } from '@/contexts/AuthContext';
+import { authStorage } from '@/contexts/auth-storage';
 
 const api = axios.create({
   baseURL: '/', // Assuming the Flask backend serves API at the root

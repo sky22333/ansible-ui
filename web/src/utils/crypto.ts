@@ -4,13 +4,21 @@
  * 前端不进行实际的加密/解密操作，而是通过识别后端传来的标记决定处理方式
  */
 
+type AuthMethod = 'password' | 'key';
+
+interface HostPasswordState {
+  password?: string;
+  auth_method?: AuthMethod;
+  is_password_encrypted?: boolean;
+}
+
 /**
  * 检查密码是否需要重新输入
  * @param host 主机信息
  * @returns 如果密码已加密且未被修改，返回true，否则返回false
  */
-export const isPasswordEncrypted = (host: any): boolean => {
-  return host && host.is_password_encrypted === true;
+export const isPasswordEncrypted = (host?: HostPasswordState | null): boolean => {
+  return host?.is_password_encrypted === true;
 };
 
 /**
@@ -20,7 +28,11 @@ export const isPasswordEncrypted = (host: any): boolean => {
  * @param useKeyAuth 是否使用密钥认证（批量添加时传入）
  * @returns 处理后的主机数据
  */
-export const prepareHostData = (hostData: any, originalHost?: any, useKeyAuth?: boolean): any => {
+export const prepareHostData = <T extends HostPasswordState>(
+  hostData: T,
+  originalHost?: HostPasswordState,
+  useKeyAuth?: boolean,
+): T => {
   // 复制主机数据
   const preparedData = { ...hostData };
   
@@ -53,7 +65,7 @@ export const prepareHostData = (hostData: any, originalHost?: any, useKeyAuth?: 
  * @param host 主机信息
  * @returns 用于显示的密码值
  */
-export const getPasswordDisplayValue = (host: any): string => {
+export const getPasswordDisplayValue = (host?: HostPasswordState | null): string => {
   if (!host) return '';
   
   // 如果密码已加密，显示占位符

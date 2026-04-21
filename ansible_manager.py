@@ -1,5 +1,4 @@
 import os
-import ansible.constants as C
 from ansible.parsing.dataloader import DataLoader
 from ansible.inventory.manager import InventoryManager
 from ansible.vars.manager import VariableManager
@@ -410,9 +409,6 @@ class AnsibleManager:
             f.write(playbook_content)
         
         try:
-            # 创建临时输出文件
-            output_file = tempfile.mktemp(prefix='ansible_output_')
-            
             # 如果提供了特定主机，则生成临时inventory
             inventory_option = []
             if target_hosts:

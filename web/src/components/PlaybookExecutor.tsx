@@ -6,6 +6,7 @@ import api from '@/services/api';
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { CheckCircleIcon, XCircleIcon } from 'lucide-react';
+import { getApiErrorMessage } from '@/utils/http';
 
 interface PlaybookExecutorProps {
   targetHostIds: number[] | 'all';
@@ -98,9 +99,7 @@ function PlaybookExecutor({ targetHostIds, onExecutionComplete, onClose }: Playb
       }
     } catch (error) {
       console.error('Playbook execution failed:', error);
-      const errorMsg = error instanceof Error 
-        ? error.message 
-        : ((error as any).response?.data?.message || (error as any).response?.data?.error || "发生未知错误");
+      const errorMsg = getApiErrorMessage(error);
       
       toast.error("Playbook执行失败", {
         description: errorMsg,

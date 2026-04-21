@@ -4,7 +4,9 @@ import LoginPage from './pages/LoginPage';
 import MainPage from './pages/MainPage';
 import TerminalPage from './pages/TerminalPage';
 import { Toaster } from "@/components/ui/sonner"; // Updated import to sonner
-import { AuthProvider, useAuth, authStorage } from './contexts/AuthContext';
+import { AuthProvider } from './contexts/AuthContext';
+import { authStorage } from './contexts/auth-storage';
+import { useAuth } from './contexts/use-auth';
 
 // Wrapper component to protect routes
 function ProtectedRoute({ children }: { children: React.ReactNode }) {

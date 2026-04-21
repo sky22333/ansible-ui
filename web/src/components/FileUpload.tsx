@@ -7,6 +7,7 @@ import { Progress } from "@/components/ui/progress"; // Import Progress componen
 import { UploadCloudIcon, FileIcon, XIcon, CheckCircleIcon, XCircleIcon } from 'lucide-react'; // Using lucide-react icons
 import { toast } from "sonner";
 import api from '@/services/api';
+import { getApiErrorMessage } from '@/utils/http';
 
 interface FileUploadProps {
   targetHostIds: number[] | 'all';
@@ -105,10 +106,8 @@ function FileUpload({ targetHostIds, onUploadComplete, onClose }: FileUploadProp
       }
     } catch (error) {
       console.error('File upload failed:', error);
-      const errorMsg = error instanceof Error 
-        ? error.message 
-        : ((error as any).response?.data?.message || (error as any).response?.data?.error || "发生未知错误");
-      
+      const errorMsg = getApiErrorMessage(error);
+
       toast.error("文件上传失败", {
         description: errorMsg,
       });

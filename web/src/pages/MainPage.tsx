@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,11 +14,13 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, SheetFooter, SheetClose } from "@/components/ui/sheet";
 import FileUpload from '@/components/FileUpload';
 import { Checkbox } from "@/components/ui/checkbox";
-import { useAuth, authStorage } from '@/contexts/AuthContext';
+import { authStorage } from '@/contexts/auth-storage';
+import { useAuth } from '@/contexts/use-auth';
 import { TerminalIcon, Github } from 'lucide-react';
 import PlaybookExecutor from '@/components/PlaybookExecutor';
 import { prepareHostData } from '@/utils/crypto';
 import { Switch } from "@/components/ui/switch";
+import { getApiErrorMessage } from '@/utils/http';
 
 // Define Host type based on backend API
 interface Host {
@@ -71,6 +73,26 @@ function MainPage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
 
+  const notifyRequestError = useCallback((title: string, logMessage: string, error: unknown, fallback = "发生未知错误") => {
+    console.error(logMessage, error);
+    toast.error(title, {
+      description: getApiErrorMessage(error, fallback),
+    });
+  }, []);
+
+  const fetchHosts = useCallback(async () => {
+    setIsLoadingHosts(true);
+    try {
+      const response = await api.get<Host[]>('/api/hosts');
+      const hostsWithStatus = response.data.map(host => ({ ...host, status: null }));
+      setHosts(hostsWithStatus);
+    } catch (error) {
+      notifyRequestError("获取主机列表失败", "Failed to fetch hosts:", error, "无法连接到服务器");
+    } finally {
+      setIsLoadingHosts(false);
+    }
+  }, [notifyRequestError]);
+
   // 改进后的认证状态检查逻辑
   useEffect(() => {
     const checkAuth = () => {
@@ -83,7 +105,7 @@ function MainPage() {
           return false;
         }
         return true;
-      } catch (error) {
+      } catch {
         return false;
       }
     };
@@ -93,37 +115,17 @@ function MainPage() {
 
     // 只有通过了认证检查，才执行后续的数据加载
     if (isAuthed) {
-      fetchHosts();
+      void fetchHosts();
     }
 
     // 完成认证检查
     setIsAuthChecking(false);
-  }, [isAuthenticated, navigate]);
-
-  useEffect(() => {
-    fetchHosts();
-  }, []);
+  }, [fetchHosts, isAuthenticated, navigate]);
 
   // 持久化密钥认证开关状态
   useEffect(() => {
     localStorage.setItem('useKeyAuth', JSON.stringify(useKeyAuth));
   }, [useKeyAuth]);
-
-  const fetchHosts = async () => {
-    setIsLoadingHosts(true);
-    try {
-      const response = await api.get<Host[]>('/api/hosts');
-      const hostsWithStatus = response.data.map(host => ({ ...host, status: null }));
-      setHosts(hostsWithStatus);
-    } catch (error) {
-      console.error('Failed to fetch hosts:', error);
-      toast.error("获取主机列表失败", {
-        description: error instanceof Error ? error.message : "无法连接到服务器",
-      });
-    } finally {
-      setIsLoadingHosts(false);
-    }
-  };
 
   const fetchAccessLogs = async (ipFilter = '', pathFilter = '') => {
     setIsLoadingAccessLogs(true);
@@ -133,10 +135,7 @@ function MainPage() {
       });
       setAccessLogs(response.data);
     } catch (error) {
-      console.error('Failed to fetch access logs:', error);
-      toast.error("获取访问日志失败", {
-        description: error instanceof Error ? error.message : "无法连接到服务器",
-      });
+      notifyRequestError("获取访问日志失败", "Failed to fetch access logs:", error, "无法连接到服务器");
     } finally {
       setIsLoadingAccessLogs(false);
     }
@@ -189,13 +188,10 @@ function MainPage() {
       const response = await api.post('/api/hosts/batch', processedHostsData);
       toast.success("成功", { description: response.data.message || `成功添加 ${response.data.count} 台主机` });
       setBatchInput('');
-      fetchHosts();
+      void fetchHosts();
       setIsBatchAddOpen(false); // Close dialog on success
     } catch (error) {
-      console.error('Failed to add hosts:', error);
-      toast.error("添加主机失败", {
-        description: error instanceof Error ? error.message : (error as any).response?.data?.error || "发生未知错误",
-      });
+      notifyRequestError("添加主机失败", "Failed to add hosts:", error);
     } finally {
       setIsAddingHost(false);
     }
@@ -220,12 +216,9 @@ function MainPage() {
       await api.put(`/api/hosts/${editingHost.id}`, dataToSend);
       toast.success("成功", { description: "主机信息已更新" });
       setEditingHost(null);
-      fetchHosts();
+      void fetchHosts();
     } catch (error) {
-      console.error('Failed to update host:', error);
-      toast.error("更新主机失败", {
-        description: error instanceof Error ? error.message : (error as any).response?.data?.error || "发生未知错误",
-      });
+      notifyRequestError("更新主机失败", "Failed to update host:", error);
     } finally {
       setIsEditingHost(false);
     }
@@ -236,12 +229,9 @@ function MainPage() {
     try {
       await api.delete(`/api/hosts/${hostId}`);
       toast.success("成功", { description: `主机 ID: ${hostId} 已删除` });
-      fetchHosts();
+      void fetchHosts();
     } catch (error) {
-      console.error('Failed to delete host:', error);
-      toast.error("删除主机失败", {
-        description: error instanceof Error ? error.message : (error as any).response?.data?.error || "发生未知错误",
-      });
+      notifyRequestError("删除主机失败", "Failed to delete host:", error);
     }
   };
 
@@ -259,7 +249,7 @@ function MainPage() {
       console.error(`Failed to ping host ${hostId}:`, error);
       setHosts(prevHosts => prevHosts.map(h => h.id === hostId ? { ...h, status: 'failed' } : h));
       toast.error(`Ping 主机 ${hostId} 失败`, {
-        description: error instanceof Error ? error.message : "检查失败",
+        description: getApiErrorMessage(error, "检查失败"),
       });
     }
   };
@@ -291,7 +281,7 @@ function MainPage() {
       toast.success("命令执行成功");
     } catch (error) {
       console.error('Command execution failed:', error);
-      const errorMsg = error instanceof Error ? error.message : (error as any).response?.data?.error || "发生未知错误";
+      const errorMsg = getApiErrorMessage(error);
       addLog(`[${new Date().toLocaleTimeString()}] 命令执行失败: ${errorMsg}`);
       toast.error("命令执行失败", { description: errorMsg });
     } finally {
@@ -357,7 +347,7 @@ function MainPage() {
           // 如果窗口未完成加载，稍后再试
           setTimeout(sendAuthInfo, 500);
         }
-      } catch (e) {
+      } catch {
         // 移除敏感日志
         toast.error('无法连接到终端', { description: '认证信息传递失败' });
       }
@@ -391,10 +381,7 @@ function MainPage() {
       toast.success("成功", { description: response.data.message });
       fetchAccessLogs(accessLogIpFilter, accessLogPathFilter);
     } catch (error) {
-      console.error('Failed to cleanup access logs:', error);
-      toast.error("清理日志失败", {
-        description: error instanceof Error ? error.message : "发生未知错误",
-      });
+      notifyRequestError("清理日志失败", "Failed to cleanup access logs:", error);
     }
   };
 

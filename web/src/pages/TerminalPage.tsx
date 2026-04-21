@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { isAxiosError } from 'axios';
 import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 // import { WebLinksAddon } from '@xterm/addon-web-links'; // Corrected import if needed
@@ -7,8 +8,9 @@ import 'xterm/css/xterm.css';
 import { Button } from '@/components/ui/button';
 import { ReloadIcon, CheckCircledIcon, CrossCircledIcon } from '@radix-ui/react-icons';
 import { toast } from "sonner"; // Updated import for sonner
-import { authStorage } from '@/contexts/AuthContext';
+import { authStorage } from '@/contexts/auth-storage';
 import api from '@/services/api';
+import { getApiErrorMessage } from '@/utils/http';
 
 // Define the shape of the resize message data
 interface ResizeData {
@@ -26,75 +28,49 @@ function TerminalPage() {
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(true);
   const [wsToken, setWsToken] = useState<string | null>(null);
-  
-  // 检查认证状态
-  useEffect(() => {
-    // 在组件挂载时检查是否已认证
-    const isAuthenticated = authStorage.getAuth();
-    const hasToken = !!authStorage.getToken();
-    
-    if (!isAuthenticated || !hasToken) {
-      // 如果未认证，显示提示信息
-      toast.error("需要登录", { description: "请先登录系统才能使用终端功能" });
-      
-      // 跳转到登录页
-      navigate('/login', { replace: true });
-      return;
-    }
-    
-    // 获取WebSocket令牌
-    fetchWsToken();
-    
-    return () => {
-      // 组件卸载时清理
-      if (socket.current) {
-        socket.current.close();
-      }
-      if (term.current) {
-        term.current.dispose();
-      }
-    };
-  }, [hostId, navigate]);
 
-  // 获取WebSocket连接令牌
-  const fetchWsToken = async () => {
+  const sendResize = useCallback(() => {
+    if (socket.current?.readyState === WebSocket.OPEN && term.current) {
+      const dimensions: ResizeData = {
+        cols: term.current.cols,
+        rows: term.current.rows,
+      };
+      socket.current.send(JSON.stringify({
+        type: 'resize',
+        data: dimensions,
+      }));
+    }
+  }, []);
+
+  const fetchWsToken = useCallback(async () => {
     try {
       if (!hostId) {
         toast.error("错误", { description: "无效的主机ID" });
         return;
       }
-      
-      // 添加token到请求中，自动由api拦截器处理
-      const response = await api.get(`/api/ws-token/${hostId}`);
-      const token = response.data.token;
-      
-      setWsToken(token);
-      
-      // 获取到token后初始化终端并连接
-      if (terminalRef.current) {
-        initializeTerminal(token);
-      }
-    } catch (error: any) {
-      toast.error("认证错误", { description: `无法获取终端连接授权` });
-      
-      // 如果是401错误，重定向到登录页
-      if (error.response?.status === 401) {
+
+      const response = await api.get<{ token: string }>(`/api/ws-token/${hostId}`);
+      setWsToken(response.data.token);
+    } catch (error: unknown) {
+      toast.error("认证错误", {
+        description: getApiErrorMessage(error, "无法获取终端连接授权"),
+      });
+
+      if (isAxiosError(error) && error.response?.status === 401) {
         navigate('/login', { replace: true });
       }
     }
-  };
+  }, [hostId, navigate]);
 
-  const connectWebSocket = (token?: string) => {
-    // 优先使用传入的token，或者使用状态中的wsToken
+  const connectWebSocket = useCallback((token?: string) => {
     const currentToken = token || wsToken;
-    
+
     if (!hostId || !currentToken) {
       toast.error("错误", { description: currentToken ? "无效的主机ID" : "未获取到连接授权" });
       setIsConnecting(false);
       return;
     }
 
-    // Close existing socket if any
     if (socket.current && socket.current.readyState !== WebSocket.CLOSED) {
       socket.current.close();
     }
@@ -113,23 +89,19 @@ function TerminalPage() {
         setIsConnected(true);
         setIsConnecting(false);
         term.current?.write('\r\n\x1b[1;32m 正在连接主机终端 \x1b[0m\r\n');
-        // Fit terminal on connect and send initial size
-        fitAddon.current?.fit(); 
+        fitAddon.current?.fit();
         sendResize();
         term.current?.focus();
       };
 
       socket.current.onmessage = (event: MessageEvent) => {
         try {
-          // 尝试解析JSON消息
           const data = JSON.parse(event.data);
           if (data.error) {
-            // 处理错误消息
             term.current?.write(`\r\n\x1b[1;31m*** 错误: ${data.error} ***\x1b[0m\r\n`);
             return;
           }
         } catch {
-          // 不是JSON，按正常文本处理
           term.current?.write(event.data);
         }
       };
@@ -137,43 +109,60 @@ function TerminalPage() {
       socket.current.onclose = (event) => {
         setIsConnected(false);
         setIsConnecting(false);
-        term.current?.write(`\r\n\x1b[1;31m*** 连接已断开 ***\x1b[0m\r\n`);
-        
-        // 如果是认证错误，重新获取令牌
-        if (event.code === 1008) { // Policy violation (可能是令牌过期)
-          fetchWsToken();
+        term.current?.write('\r\n\x1b[1;31m*** 连接已断开 ***\x1b[0m\r\n');
+
+        if (event.code === 1008) {
+          void fetchWsToken();
         }
       };
 
-      socket.current.onerror = (_error) => {
+      socket.current.onerror = () => {
         setIsConnected(false);
         setIsConnecting(false);
         term.current?.write('\r\n\x1b[1;31m*** 连接错误 ***\x1b[0m\r\n');
         toast.error("WebSocket 错误", { description: "无法连接到终端服务" });
       };
-    } catch (error) {
+    } catch {
       setIsConnecting(false);
       term.current?.write('\r\n\x1b[1;31m*** WebSocket 创建失败 ***\x1b[0m\r\n');
       toast.error("连接失败", { description: "无法创建 WebSocket 连接" });
     }
-  };
-
-  const sendResize = () => {
-    if (socket.current?.readyState === WebSocket.OPEN && term.current) {
-      const dimensions: ResizeData = {
-        cols: term.current.cols,
-        rows: term.current.rows,
-      };
-      socket.current.send(JSON.stringify({
-        type: 'resize',
-        data: dimensions,
-      }));
-    }
-  };
-
-  const initializeTerminal = (token: string) => {
-    if (!terminalRef.current || term.current) return;
+  }, [fetchWsToken, hostId, sendResize, wsToken]);
+  
+  // 检查认证状态
+  useEffect(() => {
+    // 在组件挂载时检查是否已认证
+    const isAuthenticated = authStorage.getAuth();
+    const hasToken = !!authStorage.getToken();
     
+    if (!isAuthenticated || !hasToken) {
+      // 如果未认证，显示提示信息
+      toast.error("需要登录", { description: "请先登录系统才能使用终端功能" });
+      
+      // 跳转到登录页
+      navigate('/login', { replace: true });
+      return;
+    }
+    
+    // 获取WebSocket令牌
+    void fetchWsToken();
+    
+    return () => {
+      // 组件卸载时清理
+      if (socket.current) {
+        socket.current.close();
+      }
+      if (term.current) {
+        term.current.dispose();
+      }
+    };
+  }, [fetchWsToken, navigate]);
+
+  useEffect(() => {
+    if (!terminalRef.current || term.current) {
+      return;
+    }
+
     const terminal = new Terminal({
       cursorBlink: true,
       fontSize: 14,
@@ -206,20 +195,16 @@ function TerminalPage() {
 
     fitAddon.current = new FitAddon();
     terminal.loadAddon(fitAddon.current);
-    // terminal.loadAddon(new WebLinksAddon()); // Optional: Add web links addon
 
     term.current = terminal;
     terminal.open(terminalRef.current);
 
-    // Handle data input from terminal
     terminal.onKey(({ key, domEvent }) => {
       if (domEvent.ctrlKey && domEvent.key === 'c') {
-        // 捕获 Ctrl+C，发送中断信号
         if (socket.current?.readyState === WebSocket.OPEN) {
           socket.current.send(JSON.stringify({ type: 'input', data: '\x03' }));
         }
       } else {
-        // 其他按键正常发送
         if (socket.current?.readyState === WebSocket.OPEN) {
           socket.current.send(JSON.stringify({ type: 'input', data: key }));
         }
@@ -227,44 +212,41 @@ function TerminalPage() {
     });
 
     terminal.onData((data) => {
-      // onData is still useful for paste events
       if (socket.current?.readyState === WebSocket.OPEN) {
-        // We check if the event was a single key press that we already handled
         if (data.length > 1) {
-            socket.current.send(JSON.stringify({ type: 'input', data: data }));
+          socket.current.send(JSON.stringify({ type: 'input', data }));
         }
       }
     });
 
-    // Handle resize events
     terminal.onResize(() => {
       sendResize();
     });
-    
-    // 设置窗口调整大小时自动fit终端
+
     const resizeObserver = new ResizeObserver(() => {
       fitAddon.current?.fit();
     });
-    
+
     if (terminalRef.current?.parentElement) {
       resizeObserver.observe(terminalRef.current.parentElement);
     }
-    
-    // 添加窗口resize监听作为后备
+
     const handleWindowResize = () => fitAddon.current?.fit();
     window.addEventListener('resize', handleWindowResize);
-    
-    // 初始化后立即连接WebSocket，传入token确保使用最新的token
-    connectWebSocket(token);
-    
-    // 首次适配终端大小
+
     fitAddon.current.fit();
-    
+
     return () => {
       resizeObserver.disconnect();
       window.removeEventListener('resize', handleWindowResize);
     };
-  };
+  }, [sendResize]);
+
+  useEffect(() => {
+    if (wsToken && term.current) {
+      connectWebSocket(wsToken);
+    }
+  }, [connectWebSocket, wsToken]);
 
   return (
     <div className="flex flex-col h-screen bg-background">
