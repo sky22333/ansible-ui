@@ -160,10 +160,18 @@ class Database:
         """更新主机信息"""
         with self.get_connection() as conn:
             auth_method = host_data.get('auth_method', 'password')
-            encrypted_password = None
+            current_host = conn.execute(
+                "SELECT password FROM hosts WHERE id = ?",
+                (host_id,)
+            ).fetchone()
+            current_password = current_host["password"] if current_host else None
 
-            if auth_method == 'password' and host_data.get('password'):
+            if auth_method == 'key':
+                encrypted_password = None
+            elif host_data.get('password'):
                 encrypted_password = self.crypto.encrypt(host_data['password'])
+            else:
+                encrypted_password = current_password
             
             conn.execute("""
                 UPDATE hosts 

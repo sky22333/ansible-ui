@@ -190,23 +190,9 @@ function TerminalPage() {
     term.current = terminal;
     terminal.open(terminalRef.current);
 
-    terminal.onKey(({ key, domEvent }) => {
-      if (domEvent.ctrlKey && domEvent.key === 'c') {
-        if (socket.current?.readyState === WebSocket.OPEN) {
-          socket.current.send(JSON.stringify({ type: 'input', data: '\x03' }));
-        }
-      } else {
-        if (socket.current?.readyState === WebSocket.OPEN) {
-          socket.current.send(JSON.stringify({ type: 'input', data: key }));
-        }
-      }
-    });
-
     terminal.onData((data) => {
       if (socket.current?.readyState === WebSocket.OPEN) {
-        if (data.length > 1) {
-          socket.current.send(JSON.stringify({ type: 'input', data }));
-        }
+        socket.current.send(JSON.stringify({ type: 'input', data }));
       }
     });
 
