@@ -105,5 +105,6 @@ ssh-copy-id -i /root/.ssh/id_ed25519.pub root@192.168.2.1
 
 ---
 
-## Stargazers over time
-[![Stargazers over time](https://starchart.cc/sky22333/ansible-ui.svg?variant=adaptive)](https://starchart.cc/sky22333/ansible-ui)
+## Star History
+
+[![Star History Chart](https://api.star-history.com/chart?repos=sky22333/ansible-ui&type=date&legend=top-left)](https://www.star-history.com/?repos=sky22333%2Fansible-ui&type=date&legend=top-left)
