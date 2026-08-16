@@ -107,4 +107,4 @@ ssh-copy-id -i /root/.ssh/id_ed25519.pub root@192.168.2.1
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/chart?repos=sky22333/ansible-ui&type=date&legend=top-left)](https://www.star-history.com/?repos=sky22333%2Fansible-ui&type=date&legend=top-left)
+[![Star History Chart](https://star-history.dera.page/svg?repos=sky22333/ansible-ui&type=date&legend=top-left)](https://star-history.dera.page/#sky22333/ansible-ui&type=date&legend=top-left)
